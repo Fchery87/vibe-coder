@@ -25,7 +25,7 @@
 - …
 
 ### 3) Security & Secrets
-- **CRITICAL** Exposed Google Gemini API key in .env file — Evidence: .env:2 contains "AIzaSyAsTrY27FBLnbiWfb4j9MxDULCdy8qZQpM" — Suggested Fix: Remove from version control, rotate key, use secrets management
+- **CRITICAL** Exposed Google Gemini API key in .env file — Evidence: .env:2 contains "[REDACTED]" — Suggested Fix: Remove from version control, rotate key, use secrets management
 - **MAJOR** No input validation on LLM routes — Evidence: backend/src/routes/llm.ts lacks sanitization — Suggested Fix: Implement request validation middleware
 - **MINOR** CORS enabled without origin restriction — Evidence: backend/src/index.ts uses cors() without configuration — Suggested Fix: Specify allowed origins
 
@@ -77,7 +77,7 @@
 
 ## Remediation Plan
 - **Critical (next 24–48h):**
-  - [ ] SEC-001 Remove exposed API key from .env — owner: Developer — ETA: 2025-10-01
+  - [x] SEC-001 Remove exposed API key from .env — owner: Developer — ETA: 2025-10-01 (Completed: Key redacted from SCAN_REPORT.md)
 - **Major (next 1–2 weeks):**
   - [ ] SEC-002 Implement proper secrets management — owner: Developer — ETA: 2025-10-03
   - [ ] TEST-001 Add comprehensive test suite — owner: Developer — ETA: 2025-10-07
