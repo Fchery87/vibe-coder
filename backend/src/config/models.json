@@ -1,0 +1,499 @@
+{
+  "providers": {
+    "openai": {
+      "name": "OpenAI",
+      "apiBaseUrl": "https://api.openai.com/v1",
+      "models": {
+        "gpt-4o": {
+          "name": "GPT-4o",
+          "contextWindow": 128000,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.005,
+          "outputCostPer1k": 0.015,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "code-generation",
+            "text-generation",
+            "reasoning"
+          ],
+          "routing": {
+            "priority": 1,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 60,
+            "requestsPerHour": 1000,
+            "dailyBudget": 50.00
+          }
+        },
+        "gpt-4": {
+          "name": "GPT-4",
+          "contextWindow": 8192,
+          "maxTokens": 2048,
+          "inputCostPer1k": 0.03,
+          "outputCostPer1k": 0.06,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "reasoning",
+            "analysis",
+            "complex-tasks"
+          ],
+          "routing": {
+            "priority": 2,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 40,
+            "requestsPerHour": 500,
+            "dailyBudget": 100.00
+          }
+        }
+      },
+      "xai": {
+        "name": "xAI",
+        "apiBaseUrl": "https://api.x.ai/v1",
+        "models": {
+          "grok-1": {
+            "name": "Grok-1",
+            "contextWindow": 8192,
+            "maxTokens": 2048,
+            "inputCostPer1k": 0.002,
+            "outputCostPer1k": 0.002,
+            "capabilities": [
+              "text-generation",
+              "conversation",
+              "analysis",
+              "reasoning"
+            ],
+            "strengths": [
+              "reasoning",
+              "helpful",
+              "maximally-truthful"
+            ],
+            "routing": {
+              "priority": 6,
+              "fallback": true,
+              "loadBalance": true
+            },
+            "limits": {
+              "requestsPerMinute": 100,
+              "requestsPerHour": 2500,
+              "dailyBudget": 25.00
+            }
+          },
+          "grok-1.5": {
+            "name": "Grok-1.5",
+            "contextWindow": 16384,
+            "maxTokens": 4096,
+            "inputCostPer1k": 0.003,
+            "outputCostPer1k": 0.003,
+            "capabilities": [
+              "text-generation",
+              "code-generation",
+              "conversation",
+              "analysis",
+              "reasoning"
+            ],
+            "strengths": [
+              "code-generation",
+              "reasoning",
+              "long-context"
+            ],
+            "routing": {
+              "priority": 7,
+              "fallback": true,
+              "loadBalance": true
+            },
+            "limits": {
+              "requestsPerMinute": 80,
+              "requestsPerHour": 2000,
+              "dailyBudget": 35.00
+            }
+          }
+        }
+      },
+      "supernova": {
+        "name": "Supernova AI",
+        "apiBaseUrl": "https://api.supernova.ai/v1",
+        "models": {
+          "supernova-fast": {
+            "name": "Supernova Fast",
+            "contextWindow": 32768,
+            "maxTokens": 4096,
+            "inputCostPer1k": 0.001,
+            "outputCostPer1k": 0.001,
+            "capabilities": [
+              "text-generation",
+              "code-generation",
+              "conversation",
+              "analysis",
+              "planning",
+              "multimodal"
+            ],
+            "strengths": [
+              "fast-inference",
+              "cost-effective",
+              "versatile"
+            ],
+            "routing": {
+              "priority": 8,
+              "fallback": true,
+              "loadBalance": true
+            },
+            "limits": {
+              "requestsPerMinute": 200,
+              "requestsPerHour": 5000,
+              "dailyBudget": 15.00
+            }
+          },
+          "supernova-pro": {
+            "name": "Supernova Pro",
+            "contextWindow": 65536,
+            "maxTokens": 8192,
+            "inputCostPer1k": 0.004,
+            "outputCostPer1k": 0.004,
+            "capabilities": [
+              "text-generation",
+              "code-generation",
+              "conversation",
+              "analysis",
+              "planning",
+              "reasoning",
+              "multimodal"
+            ],
+            "strengths": [
+              "high-quality",
+              "long-context",
+              "advanced-reasoning"
+            ],
+            "routing": {
+              "priority": 9,
+              "fallback": true,
+              "loadBalance": false
+            },
+            "limits": {
+              "requestsPerMinute": 60,
+              "requestsPerHour": 1500,
+              "dailyBudget": 50.00
+            }
+          }
+        }
+      }
+    },
+    "anthropic": {
+      "name": "Anthropic",
+      "apiBaseUrl": "https://api.anthropic.com/v1",
+      "models": {
+        "claude-3-opus": {
+          "name": "Claude 3 Opus",
+          "contextWindow": 200000,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.015,
+          "outputCostPer1k": 0.075,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis",
+            "planning"
+          ],
+          "strengths": [
+            "planning",
+            "analysis",
+            "long-context"
+          ],
+          "routing": {
+            "priority": 3,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 50,
+            "requestsPerHour": 800,
+            "dailyBudget": 75.00
+          }
+        },
+        "claude-3-sonnet": {
+          "name": "Claude 3 Sonnet",
+          "contextWindow": 200000,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.003,
+          "outputCostPer1k": 0.015,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "code-generation",
+            "conversation",
+            "cost-effective"
+          ],
+          "routing": {
+            "priority": 4,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 100,
+            "requestsPerHour": 2000,
+            "dailyBudget": 30.00
+          }
+        },
+        "claude-3.5-sonnet": {
+          "name": "Claude 3.5 Sonnet",
+          "contextWindow": 200000,
+          "maxTokens": 8192,
+          "inputCostPer1k": 0.003,
+          "outputCostPer1k": 0.015,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis",
+            "planning",
+            "reasoning"
+          ],
+          "strengths": [
+            "advanced-reasoning",
+            "planning",
+            "code-generation",
+            "analysis"
+          ],
+          "routing": {
+            "priority": 3,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 50,
+            "requestsPerHour": 1000,
+            "dailyBudget": 50.00
+          }
+        }
+      }
+    },
+    "google": {
+      "name": "Google AI",
+      "apiBaseUrl": "https://generativelanguage.googleapis.com/v1",
+      "models": {
+        "gemini-pro": {
+          "name": "Gemini Pro",
+          "contextWindow": 32768,
+          "maxTokens": 2048,
+          "inputCostPer1k": 0.0005,
+          "outputCostPer1k": 0.0015,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "multimodal"
+          ],
+          "strengths": [
+            "multimodal",
+            "cost-effective",
+            "fast-inference"
+          ],
+          "routing": {
+            "priority": 5,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 120,
+            "requestsPerHour": 3000,
+            "dailyBudget": 20.00
+          }
+        },
+        "gemini-1.5-pro": {
+          "name": "Gemini 1.5 Pro",
+          "contextWindow": 2097152,
+          "maxTokens": 8192,
+          "inputCostPer1k": 0.00125,
+          "outputCostPer1k": 0.005,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "multimodal",
+            "analysis",
+            "reasoning"
+          ],
+          "strengths": [
+            "long-context",
+            "multimodal",
+            "advanced-reasoning",
+            "code-generation"
+          ],
+          "routing": {
+            "priority": 2,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 60,
+            "requestsPerHour": 1500,
+            "dailyBudget": 50.00
+          }
+        },
+        "gemini-1.5-flash": {
+          "name": "Gemini 1.5 Flash",
+          "contextWindow": 1048576,
+          "maxTokens": 8192,
+          "inputCostPer1k": 0.000075,
+          "outputCostPer1k": 0.0003,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "multimodal",
+            "analysis"
+          ],
+          "strengths": [
+            "fast-inference",
+            "cost-effective",
+            "multimodal",
+            "long-context"
+          ],
+          "routing": {
+            "priority": 6,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 200,
+            "requestsPerHour": 5000,
+            "dailyBudget": 15.00
+          }
+        }
+      }
+    },
+    "ollama": {
+      "name": "Ollama (Local)",
+      "apiBaseUrl": "http://localhost:11434/v1",
+      "models": {
+        "llama2": {
+          "name": "Llama 2 7B",
+          "contextWindow": 4096,
+          "maxTokens": 2048,
+          "inputCostPer1k": 0.0,
+          "outputCostPer1k": 0.0,
+          "capabilities": [
+            "text-generation",
+            "conversation"
+          ],
+          "strengths": [
+            "local-inference",
+            "privacy",
+            "no-api-limits"
+          ],
+          "routing": {
+            "priority": 10,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 60,
+            "requestsPerHour": 1000,
+            "dailyBudget": 0.0
+          }
+        },
+        "codellama": {
+          "name": "Code Llama",
+          "contextWindow": 4096,
+          "maxTokens": 2048,
+          "inputCostPer1k": 0.0,
+          "outputCostPer1k": 0.0,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation"
+          ],
+          "strengths": [
+            "code-generation",
+            "local-inference",
+            "privacy"
+          ],
+          "routing": {
+            "priority": 11,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 60,
+            "requestsPerHour": 1000,
+            "dailyBudget": 0.0
+          }
+        },
+        "mistral": {
+          "name": "Mistral 7B",
+          "contextWindow": 4096,
+          "maxTokens": 2048,
+          "inputCostPer1k": 0.0,
+          "outputCostPer1k": 0.0,
+          "capabilities": [
+            "text-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "reasoning",
+            "local-inference",
+            "privacy"
+          ],
+          "routing": {
+            "priority": 12,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 60,
+            "requestsPerHour": 1000,
+            "dailyBudget": 0.0
+          }
+        }
+      }
+    }
+  },
+  "routingModes": {
+    "manual": {
+      "description": "User selects specific model for each request",
+      "selection": "user-choice"
+    },
+    "heuristic": {
+      "description": "Automatic selection based on task requirements and model strengths",
+      "selection": "capability-matching"
+    },
+    "cost-aware": {
+      "description": "Prioritizes cost efficiency while meeting requirements",
+      "selection": "cost-optimization"
+    },
+    "orchestrated": {
+      "description": "Uses specialized models for different workflow stages (Claude for planning, GPT for code, Gemini for UI)",
+      "selection": "stage-specialization"
+    },
+    "single-model": {
+      "description": "Uses only one configured provider for all operations",
+      "selection": "single-provider"
+    }
+  },
+  "globalLimits": {
+    "maxConcurrentRequests": 10,
+    "globalDailyBudget": 200.00,
+    "retryAttempts": 3,
+    "timeoutSeconds": 30
+  }
+}
