@@ -51,11 +51,25 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
   const { prompt, model, routingMode, capabilities, priority, maxCost, activeProvider, allowFailover } = req.body;
 
   try {
-    let targetModel = model || 'gpt-4o';
+    let targetModel = 'gpt-4o';
     let targetProvider = 'openai';
 
-    // Use routing service if routing mode is specified
-    if (routingMode && routingMode !== 'manual') {
+    // 1) If client provided a model, always honor it and skip routing
+    if (typeof model === 'string' && model.trim().length > 0) {
+      const [provider, modelName] = model.includes(':') ? model.split(':', 2) : [(activeProvider || 'openai'), model];
+      targetProvider = provider.toLowerCase();
+      targetModel = modelName;
+    } else if (routingMode === 'single-model') {
+      // 2) Single-model mode without explicit model: build a sensible default from activeProvider
+      const provider = (activeProvider || 'openai').toLowerCase();
+      targetProvider = provider;
+      if (provider === 'xai') targetModel = 'grok-code-fast-1';
+      else if (provider === 'openai') targetModel = 'gpt-4o';
+      else if (provider === 'anthropic') targetModel = 'claude-3.5-sonnet';
+      else if (provider === 'google') targetModel = 'gemini-2.5';
+      else targetModel = 'gpt-4o';
+    } else if (routingMode && routingMode !== 'manual') {
+      // 3) Otherwise use routing service
       const context: RoutingContext = {
         mode: routingMode as any,
         capabilities,
@@ -71,18 +85,49 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
 
       // Add routing decision to response headers for debugging
       res.set('X-Routing-Decision', JSON.stringify(decision));
-    } else if (model) {
-      // Manual routing with specific model
-      const [provider, modelName] = model.includes(':')
-        ? model.split(':')
-        : ['openai', model];
-      targetProvider = provider;
-      targetModel = modelName;
+    }
+
+    // Validate provider configuration
+    const providerConfigured = providerManager.isProviderConfigured(targetProvider);
+    if (!providerConfigured) {
+      return res.status(422).json({
+        error: 'Provider not configured',
+        provider: targetProvider,
+        hint: targetProvider === 'xai'
+          ? 'Set XAI_API_KEY in .env.local'
+          : targetProvider === 'openai'
+            ? 'Set OPENAI_API_KEY in .env.local'
+            : targetProvider === 'anthropic'
+              ? 'Set ANTHROPIC_API_KEY in .env.local'
+              : targetProvider === 'google'
+                ? 'Set GOOGLE_API_KEY in .env.local'
+                : 'Check provider setup'
+      });
+    }
+
+    // Validate model availability for provider
+    const availableModels = providerManager.getProviderModels(targetProvider);
+    if (!availableModels.includes(targetModel)) {
+      return res.status(422).json({
+        error: 'Model not supported for provider',
+        provider: targetProvider,
+        model: targetModel,
+        availableModels
+      });
+    }
+
+    // Validate model registry entry exists
+    const modelConfig = modelRegistry.getModel(targetProvider, targetModel);
+    if (!modelConfig) {
+      return res.status(422).json({
+        error: 'Missing model registry entry',
+        provider: targetProvider,
+        model: targetModel
+      });
     }
 
     // Generate code using the selected provider and model
-    const modelConfig = modelRegistry.getModel(targetProvider, targetModel);
-    const result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig || undefined);
+    const result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig);
 
     if (!result) {
       throw new Error('No response generated from model');

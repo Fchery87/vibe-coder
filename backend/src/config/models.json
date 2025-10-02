@@ -121,6 +121,35 @@
               "requestsPerHour": 2000,
               "dailyBudget": 35.00
             }
+          },
+          "grok-code-fast-1": {
+            "name": "Grok Code Fast 1",
+            "contextWindow": 8192,
+            "maxTokens": 4096,
+            "inputCostPer1k": 0.001,
+            "outputCostPer1k": 0.001,
+            "capabilities": [
+              "text-generation",
+              "code-generation",
+              "conversation",
+              "analysis",
+              "reasoning"
+            ],
+            "strengths": [
+              "code-generation",
+              "fast-inference",
+              "cost-effective"
+            ],
+            "routing": {
+              "priority": 1,
+              "fallback": true,
+              "loadBalance": true
+            },
+            "limits": {
+              "requestsPerMinute": 200,
+              "requestsPerHour": 5000,
+              "dailyBudget": 25.00
+            }
           }
         }
       },

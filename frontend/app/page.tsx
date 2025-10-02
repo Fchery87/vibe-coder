@@ -46,7 +46,8 @@ export default function Home() {
     error?: string;
   } | null>(null);
   const [routingMode, setRoutingMode] = useState<string>('orchestrated');
-  const [activeProvider, setActiveProvider] = useState<string>('');
+  const [activeProvider, setActiveProvider] = useState<string>('xai');
+  const [selectedModel, setSelectedModel] = useState<string>('grok-code-fast-1');
   const [allowFailover, setAllowFailover] = useState<boolean>(false);
   const [singleModelMode, setSingleModelMode] = useState<boolean>(false);
   const [isRunningQualityCheck, setIsRunningQualityCheck] = useState(false);
@@ -102,10 +103,21 @@ export default function Home() {
     try {
       const requestBody: any = { prompt, routingMode };
 
-      // Add single-model mode parameters if enabled
-      if (singleModelMode) {
+      // If user enabled single-model mode and selected a provider, honor it.
+      // Also, when provider is xai, default model to grok-code-fast-1 unless overridden.
+      if (singleModelMode && activeProvider) {
         requestBody.activeProvider = activeProvider;
         requestBody.allowFailover = allowFailover;
+        if (selectedModel) {
+          requestBody.model = `${activeProvider}:${selectedModel}`;
+        } else if (activeProvider.toLowerCase() === 'xai' && !requestBody.model) {
+          requestBody.model = 'xai:grok-code-fast-1';
+        }
+      }
+
+      // If not using single-model mode but routingMode is manual, default to xAI fast coder for testing
+      if (!singleModelMode && routingMode === 'manual' && !requestBody.model && activeProvider && selectedModel) {
+        requestBody.model = `${activeProvider}:${selectedModel}`;
       }
 
       setSandboxLogs(prev => [...prev, {
@@ -658,7 +670,15 @@ export default function Home() {
                 <span className="text-xs text-gray-400">Provider:</span>
                 <select
                   value={activeProvider}
-                  onChange={(e) => setActiveProvider(e.target.value)}
+                  onChange={(e) => {
+                    const p = e.target.value;
+                    setActiveProvider(p);
+                    if (p === 'xai') setSelectedModel('grok-code-fast-1');
+                    else if (p === 'openai') setSelectedModel('gpt-4o');
+                    else if (p === 'anthropic') setSelectedModel('claude-3.5-sonnet');
+                    else if (p === 'google') setSelectedModel('gemini-2.5');
+                    else setSelectedModel('');
+                  }}
                   className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
                 >
                   <option value="">Select Provider</option>
@@ -666,7 +686,49 @@ export default function Home() {
                   <option value="anthropic">Anthropic</option>
                   <option value="google">Google</option>
                   <option value="xai">xAI</option>
-                  <option value="supernova">Supernova</option>
+                </select>
+
+                <span className="text-xs text-gray-400">Model:</span>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
+                >
+                  {activeProvider === 'xai' && (
+                    <>
+                      <option value="grok-code-fast-1">grok-code-fast-1</option>
+                      <option value="grok-1.5">grok-1.5</option>
+                      <option value="grok-1">grok-1</option>
+                    </>
+                  )}
+                  {activeProvider === 'openai' && (
+                    <>
+                      <option value="gpt-5">gpt-5</option>
+                      <option value="gpt-5-codex">gpt-5-codex</option>
+                    </>
+                  )}
+                  {activeProvider === 'anthropic' && (
+                    <>
+                      <option value="claude-3-opus">claude-3-opus</option>
+                      <option value="claude-3-sonnet">claude-3-sonnet</option>
+                      <option value="claude-3-haiku">claude-3-haiku</option>
+                      <option value="claude-3.5-sonnet">claude-3.5-sonnet</option>
+                      <option value="claude-3.5-sonnet-200k">claude-3.5-sonnet-200k</option>
+                      <option value="claude-3.5-haiku">claude-3.5-haiku</option>
+                      <option value="claude-3.7">claude-3.7</option>
+                      <option value="claude-3.7-sonnet">claude-3.7-sonnet</option>
+                      <option value="claude-3.7-haiku">claude-3.7-haiku</option>
+                      <option value="claude-2.1">claude-2.1</option>
+                      <option value="claude-2.0">claude-2.0</option>
+                      <option value="claude-instant-1.2">claude-instant-1.2</option>
+                    </>
+                  )}
+                  {activeProvider === 'google' && (
+                    <>
+                      <option value="gemini-2.5">gemini-2.5</option>
+                      <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                    </>
+                  )}
                 </select>
 
                 <label className="flex items-center gap-1 text-xs text-gray-400">

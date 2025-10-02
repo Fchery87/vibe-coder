@@ -38,11 +38,13 @@ export class XAIService {
         })
       });
 
+      let data: any;
       if (!response.ok) {
-        throw new Error(`xAI API error: ${response.status} ${response.statusText}`);
+        const errText = await response.text().catch(() => '');
+        throw new Error(`xAI API error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
+      } else {
+        data = await response.json();
       }
-
-      const data = await response.json();
       return data.choices?.[0]?.message?.content || '';
     } catch (error) {
       console.error('xAI service error:', error);
@@ -51,10 +53,17 @@ export class XAIService {
   }
 
   async generateWithModel(prompt: string, modelConfig: ModelConfig): Promise<string> {
-    return this.generateCode(prompt, modelConfig.name.toLowerCase().replace('grok-', 'grok-'));
+    // Map model names to xAI API model names
+    const modelMap: { [key: string]: string } = {
+      'grok-1': 'grok-1',
+      'grok-1.5': 'grok-1.5',
+      'grok-code-fast-1': 'grok-code-fast-1' // Use the correct model name as shown in xAI console
+    };
+    const apiModel = modelMap[modelConfig.name.toLowerCase()] || 'grok-1';
+    return this.generateCode(prompt, apiModel);
   }
 
   getAvailableModels(): string[] {
-    return ['grok-1', 'grok-1.5'];
+    return ['grok-1', 'grok-1.5', 'grok-code-fast-1'];
   }
 }
