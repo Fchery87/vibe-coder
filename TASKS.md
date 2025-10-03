@@ -192,6 +192,76 @@ setAllowFailover(false);
 
 ---
 
+
+## Phase 5: Browser‑Based Provider Credentials (Security & UX)
+
+Purpose: Manage all Code Assist API keys (OpenAI, Anthropic, Google Gemini, xAI) **from the browser UI** without editing code, while keeping secrets safe.
+
+### 5.1 UI — Settings → Providers
+- [ ] Create Providers settings route/section
+- [ ] Provider cards (OpenAI, Anthropic, Google, xAI) with:
+  - [ ] Password input for API key
+  - [ ] Actions: **Save**, **Verify**, **Remove**
+  - [ ] Toggle: **Enable for this project**
+  - [ ] Masked key display (e.g., `sk-****1234`) + last verified timestamp
+  - [ ] Status pill: **Verified / Invalid / Missing**
+- [ ] Toast notifications for save/verify/remove
+- [ ] Error states with inline validation messages
+- [ ] Accessibility pass (labels, focus states, keyboard nav)
+
+### 5.2 Server API (CRUD + Verify)
+- [ ] `POST   /api/providers/:provider/credentials` — save/update key
+- [ ] `GET    /api/providers` — list providers with masked keys + status
+- [ ] `POST   /api/providers/:provider/verify` — vendor ping to validate
+- [ ] `DELETE /api/providers/:provider/credentials` — remove/disable
+- [ ] Rate limits on all credential endpoints
+
+**Response (example):**
+```json
+{ "provider":"anthropic","status":"verified","maskedKey":"sk-ant-****Q9A3","active":true,"lastVerifiedAt":"2025-10-01T20:10:00Z" }
+```
+
+### 5.3 Secure Storage & Crypto
+- [ ] Choose storage: **Encrypted DB column** (SQLite/Postgres) or **encrypted file vault** (`secrets.enc.json`)
+- [ ] Implement AES‑GCM or libsodium sealed boxes (unique IV/nonce per record)
+- [ ] Load master key from OS keychain or environment (never committed)
+- [ ] In‑memory key TTL + zeroization after use
+- [ ] No secrets in logs/telemetry; redact request bodies for these routes
+- [ ] Backup/restore flow (optional): encrypted export `secrets.backup.enc` with passphrase
+
+**Table shape (`provider_credentials`):**
+```ts
+id uuid, project_id uuid, provider text, label text null,
+encrypted_key text, iv text, active boolean default true,
+created_at timestamptz, updated_at timestamptz, last_verified_at timestamptz null
+```
+
+### 5.4 Orchestrator Integration
+- [ ] Read credentials at runtime based on `project.activeProvider`
+- [ ] Respect **Single‑Model Mode** and `allowFailover=false` (never query other providers)
+- [ ] Clear error when missing key: “No API key found for <provider>. Add one in Settings → Providers.”
+- [ ] Telemetry: include **Active provider**, **Failover on/off**, tokens, cost, duration (no raw keys)
+
+### 5.5 Acceptance Tests
+- [ ] Save → Verify → Enable provider; orchestrator can call model successfully
+- [ ] Missing key → friendly error; zero outbound requests made
+- [ ] Revoked/invalid key → verify shows **Invalid**, orchestrator blocks with guidance
+- [ ] Log audit shows no secrets; masked keys only
+- [ ] CSRF & HTTPS enforced; endpoints rate‑limited; 429 handled in UI
+- [ ] Export/import secrets (if enabled) round‑trips without plaintext exposure
+
+### 5.6 Developer Docs
+- [ ] Update README: how to add/verify/rotate keys via UI
+- [ ] Add SECURITY.md explaining storage, encryption, key rotation
+- [ ] Add API reference for the four credential endpoints
+
+### 5.7 Stretch
+- [ ] Per‑environment keys (dev/preview/prod) with scoped enablement
+- [ ] Multiple keys per provider with priority + automatic failover (optional)
+- [ ] Hardware‑backed key storage (platform keychain/KMS)
+
+
+
 ## Ongoing Tasks
 
 - [ ] Regularly review sandbox safety (block network by default, resource caps)

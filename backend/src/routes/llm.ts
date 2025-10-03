@@ -33,7 +33,13 @@ const activeExecutions = new Map<string, any>();
 const validateGenerateRequest = [
   body('prompt').isString().notEmpty().withMessage('Prompt must be a non-empty string.'),
   body('model').optional().isString().withMessage('Model must be a string.'),
-  body('routingMode').optional().isIn(['quality', 'cost', 'latency', 'manual']).withMessage('Invalid routing mode.'),
+  body('routingMode').optional().isIn([
+    'manual',
+    'heuristic',
+    'cost-aware',
+    'orchestrated',
+    'single-model'
+  ]).withMessage('Invalid routing mode.'),
   body('capabilities').optional().isArray().withMessage('Capabilities must be an array.'),
   body('capabilities.*').optional().isString().withMessage('Capabilities must be an array of strings.'),
   body('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Invalid priority.'),
