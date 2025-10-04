@@ -7,7 +7,7 @@ export class GoogleService implements LLMProvider {
 
   constructor() {
     this.apiKey = process.env.GOOGLE_API_KEY || '';
-    this.apiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+    this.apiBaseUrl = 'https://generativelanguage.googleapis.com/v1';
 
     if (!this.apiKey) {
       throw new Error('GOOGLE_API_KEY environment variable is required');
@@ -15,7 +15,7 @@ export class GoogleService implements LLMProvider {
   }
 
   async generateCode(prompt: string, model?: string): Promise<string> {
-    const modelName = model || 'gemini-pro';
+    const modelName = model || 'gemini-1.5-pro';
 
     const response = await fetch(`${this.apiBaseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`, {
       method: 'POST',
@@ -58,8 +58,6 @@ export class GoogleService implements LLMProvider {
   async generateWithModel(prompt: string, modelConfig: ModelConfig): Promise<string> {
     // Map our internal model names to Google's model names
     const modelMapping: { [key: string]: string } = {
-      'gemini-pro': 'gemini-pro',
-      'gemini-pro-vision': 'gemini-pro-vision',
       'gemini-1.5-pro': 'gemini-1.5-pro',
       'gemini-1.5-flash': 'gemini-1.5-flash'
     };
@@ -106,8 +104,6 @@ export class GoogleService implements LLMProvider {
 
   getAvailableModels(): string[] {
     return [
-      'gemini-pro',
-      'gemini-pro-vision',
       'gemini-1.5-pro',
       'gemini-1.5-flash'
     ];

@@ -690,7 +690,7 @@ export default function Home() {
                     if (p === 'xai') setSelectedModel('grok-code-fast-1');
                     else if (p === 'openai') setSelectedModel('gpt-4o');
                     else if (p === 'anthropic') setSelectedModel('claude-3.5-sonnet');
-                    else if (p === 'google') setSelectedModel('gemini-2.5');
+                    else if (p === 'google') setSelectedModel('gemini-1.5-pro');
                     else setSelectedModel('');
                   }}
                   className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
@@ -739,8 +739,8 @@ export default function Home() {
                   )}
                   {activeProvider === 'google' && (
                     <>
-                      <option value="gemini-2.5">gemini-2.5</option>
-                      <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                      <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                      <option value="gemini-1.5-flash">gemini-1.5-flash</option>
                     </>
                   )}
                 </select>

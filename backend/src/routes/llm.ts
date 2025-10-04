@@ -168,6 +168,46 @@ const greetUser = (name) => {
 };
 
 console.log(greetUser("World")); // Output: Hello, World! Welcome to the application.`;
+      } else if (targetProvider === 'openai') {
+        result = `// Mock response: OpenAI API key not configured
+// To use OpenAI, add your OPENAI_API_KEY to .env.local
+const createTodoApp = () => {
+  const todos = [];
+  const addTodo = (text) => todos.push({ text, completed: false });
+  const toggleTodo = (index) => todos[index].completed = !todos[index].completed;
+  const getTodos = () => todos;
+
+  return { addTodo, toggleTodo, getTodos };
+};
+
+const app = createTodoApp();
+app.addTodo("Learn AI programming");
+app.addTodo("Build amazing apps");
+console.log("Todos:", app.getTodos());`;
+      } else if (targetProvider === 'anthropic') {
+        result = `// Mock response: Anthropic API key not configured
+// To use Anthropic, add your ANTHROPIC_API_KEY to .env.local
+class WeatherService {
+  constructor() {
+    this.weatherData = {
+      'New York': { temp: 72, condition: 'Sunny' },
+      'London': { temp: 15, condition: 'Cloudy' },
+      'Tokyo': { temp: 25, condition: 'Rainy' }
+    };
+  }
+
+  getWeather(city) {
+    return this.weatherData[city] || { temp: 20, condition: 'Unknown' };
+  }
+
+  getAllCities() {
+    return Object.keys(this.weatherData);
+  }
+}
+
+const weather = new WeatherService();
+console.log("Weather in New York:", weather.getWeather("New York"));
+console.log("Available cities:", weather.getAllCities());`;
       } else {
         result = `// Mock response: API service unavailable
 // Generated code would appear here when the service is available
@@ -1188,3 +1228,4 @@ router.post('/workflow/generate', async (req: Request, res: Response) => {
 });
 
 export default router;
+"" 
