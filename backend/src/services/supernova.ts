@@ -10,10 +10,16 @@ export class SupernovaService {
   }
 
   async generateCode(prompt: string, model: string = 'supernova-fast'): Promise<string> {
+    console.log('[supernova] generateCode called with model:', model);
+    console.log('[supernova] API key loaded:', this.apiKey ? 'YES' : 'NO');
+    console.log('[supernova] Prompt length:', prompt.length);
+
     if (!this.apiKey) {
-      // For demo purposes, return a mock response if no API key is set
+      console.log('[supernova] No API key provided, using mock response');
       return this.generateMockResponse(prompt, model);
     }
+
+    console.log('[supernova] API key is available, making request to Supernova API');
 
     try {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {

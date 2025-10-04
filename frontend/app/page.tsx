@@ -116,7 +116,7 @@ export default function Home() {
         if (selectedModel) {
           requestBody.model = `${activeProvider}:${selectedModel}`;
         } else if (activeProvider.toLowerCase() === 'xai' && !requestBody.model) {
-          requestBody.model = 'xai:grok-code-fast-1';
+          requestBody.model = 'xai:grok-4-fast-reasoning';
         }
       }
 
@@ -687,9 +687,9 @@ export default function Home() {
                   onChange={(e) => {
                     const p = e.target.value;
                     setActiveProvider(p);
-                    if (p === 'xai') setSelectedModel('grok-code-fast-1');
+                    if (p === 'xai') setSelectedModel('grok-4-fast-reasoning');
                     else if (p === 'openai') setSelectedModel('gpt-4o');
-                    else if (p === 'anthropic') setSelectedModel('claude-3.5-sonnet');
+                    else if (p === 'anthropic') setSelectedModel('claude-3-5-sonnet-20241022');
                     else if (p === 'google') setSelectedModel('gemini-2.5-pro');
                     else setSelectedModel('');
                   }}
@@ -710,31 +710,30 @@ export default function Home() {
                 >
                   {activeProvider === 'xai' && (
                     <>
+                      <option value="grok-4-fast-reasoning">grok-4-fast-reasoning</option>
+                      <option value="grok-4-fast-non-reasoning">grok-4-fast-non-reasoning</option>
+                      <option value="grok-4-0709">grok-4-0709</option>
                       <option value="grok-code-fast-1">grok-code-fast-1</option>
-                      <option value="grok-1.5">grok-1.5</option>
-                      <option value="grok-1">grok-1</option>
+                      <option value="grok-3">grok-3</option>
+                      <option value="grok-3-mini">grok-3-mini</option>
+                      <option value="grok-2-vision-1212us-east-1">grok-2-vision-us-east</option>
+                      <option value="grok-2-vision-1212eu-west-1">grok-2-vision-eu-west</option>
                     </>
                   )}
                   {activeProvider === 'openai' && (
                     <>
-                      <option value="gpt-5">gpt-5</option>
-                      <option value="gpt-5-codex">gpt-5-codex</option>
+                      <option value="gpt-4o">gpt-4o</option>
+                      <option value="gpt-4-turbo">gpt-4-turbo</option>
+                      <option value="gpt-4">gpt-4</option>
+                      <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
                     </>
                   )}
                   {activeProvider === 'anthropic' && (
                     <>
-                      <option value="claude-3-opus">claude-3-opus</option>
-                      <option value="claude-3-sonnet">claude-3-sonnet</option>
-                      <option value="claude-3-haiku">claude-3-haiku</option>
-                      <option value="claude-3.5-sonnet">claude-3.5-sonnet</option>
-                      <option value="claude-3.5-sonnet-200k">claude-3.5-sonnet-200k</option>
-                      <option value="claude-3.5-haiku">claude-3.5-haiku</option>
-                      <option value="claude-3.7">claude-3.7</option>
-                      <option value="claude-3.7-sonnet">claude-3.7-sonnet</option>
-                      <option value="claude-3.7-haiku">claude-3.7-haiku</option>
-                      <option value="claude-2.1">claude-2.1</option>
-                      <option value="claude-2.0">claude-2.0</option>
-                      <option value="claude-instant-1.2">claude-instant-1.2</option>
+                      <option value="claude-3-5-sonnet-20241022">claude-3.5-sonnet</option>
+                      <option value="claude-3-opus-20240229">claude-3-opus</option>
+                      <option value="claude-3-sonnet-20240229">claude-3-sonnet</option>
+                      <option value="claude-3-haiku-20240307">claude-3-haiku</option>
                     </>
                   )}
                   {activeProvider === 'google' && (

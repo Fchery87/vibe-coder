@@ -32,6 +32,36 @@
             "dailyBudget": 50
           }
         },
+        "gpt-4-turbo": {
+          "name": "GPT-4 Turbo",
+          "contextWindow": 128000,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.01,
+          "outputCostPer1k": 0.03,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis",
+            "reasoning"
+          ],
+          "strengths": [
+            "advanced-reasoning",
+            "large-context",
+            "code-generation",
+            "analysis"
+          ],
+          "routing": {
+            "priority": 1,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 60,
+            "requestsPerHour": 1000,
+            "dailyBudget": 75
+          }
+        },
         "gpt-4": {
           "name": "GPT-4",
           "contextWindow": 8192,
@@ -50,7 +80,7 @@
             "complex-tasks"
           ],
           "routing": {
-            "priority": 2,
+            "priority": 3,
             "fallback": true,
             "loadBalance": false
           },
@@ -59,6 +89,34 @@
             "requestsPerHour": 500,
             "dailyBudget": 100
           }
+        },
+        "gpt-3.5-turbo": {
+          "name": "GPT-3.5 Turbo",
+          "contextWindow": 16385,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.0015,
+          "outputCostPer1k": 0.002,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "fast-inference",
+            "cost-effective",
+            "reliable"
+          ],
+          "routing": {
+            "priority": 4,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 200,
+            "requestsPerHour": 5000,
+            "dailyBudget": 20
+          }
         }
       }
     },
@@ -66,12 +124,12 @@
       "name": "Anthropic",
       "apiBaseUrl": "https://api.anthropic.com/v1",
       "models": {
-        "claude-3-opus": {
-          "name": "Claude 3 Opus",
+        "claude-3-5-sonnet-20241022": {
+          "name": "Claude 3.5 Sonnet",
           "contextWindow": 200000,
-          "maxTokens": 4096,
-          "inputCostPer1k": 0.015,
-          "outputCostPer1k": 0.075,
+          "maxTokens": 8192,
+          "inputCostPer1k": 0.003,
+          "outputCostPer1k": 0.015,
           "capabilities": [
             "text-generation",
             "code-generation",
@@ -95,12 +153,12 @@
             "dailyBudget": 75
           }
         },
-        "claude-3-sonnet": {
-          "name": "Claude 3 Sonnet",
+        "claude-3-opus-20240229": {
+          "name": "Claude 3 Opus",
           "contextWindow": 200000,
           "maxTokens": 4096,
-          "inputCostPer1k": 0.003,
-          "outputCostPer1k": 0.015,
+          "inputCostPer1k": 0.015,
+          "outputCostPer1k": 0.075,
           "capabilities": [
             "text-generation",
             "code-generation",
@@ -123,10 +181,10 @@
             "dailyBudget": 30
           }
         },
-        "claude-3.5-sonnet": {
-          "name": "Claude 3.5 Sonnet",
+        "claude-3-sonnet-20240229": {
+          "name": "Claude 3 Sonnet",
           "contextWindow": 200000,
-          "maxTokens": 8192,
+          "maxTokens": 4096,
           "inputCostPer1k": 0.003,
           "outputCostPer1k": 0.015,
           "capabilities": [
@@ -152,6 +210,34 @@
             "requestsPerMinute": 50,
             "requestsPerHour": 1000,
             "dailyBudget": 50
+          }
+        },
+        "claude-3-haiku-20240307": {
+          "name": "Claude 3 Haiku",
+          "contextWindow": 200000,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.00025,
+          "outputCostPer1k": 0.00125,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "fastest-inference",
+            "most-cost-effective",
+            "quick-responses"
+          ],
+          "routing": {
+            "priority": 4,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 200,
+            "requestsPerHour": 5000,
+            "dailyBudget": 15
           }
         }
       }
@@ -371,69 +457,101 @@
       "name": "xAI",
       "apiBaseUrl": "https://api.x.ai/v1",
       "models": {
-        "grok-1": {
-          "name": "Grok-1",
-          "contextWindow": 8192,
-          "maxTokens": 2048,
-          "inputCostPer1k": 0.002,
-          "outputCostPer1k": 0.002,
+        "grok-4-fast-reasoning": {
+          "name": "Grok 4 Fast Reasoning",
+          "contextWindow": 2000000,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.0002,
+          "outputCostPer1k": 0.0005,
           "capabilities": [
             "text-generation",
+            "code-generation",
             "conversation",
             "analysis",
-            "reasoning"
+            "reasoning",
+            "planning"
           ],
           "strengths": [
-            "reasoning",
-            "helpful",
-            "maximally-truthful"
+            "fastest-reasoning",
+            "large-context",
+            "advanced-reasoning",
+            "cost-effective"
           ],
           "routing": {
-            "priority": 6,
+            "priority": 1,
             "fallback": true,
             "loadBalance": true
           },
           "limits": {
-            "requestsPerMinute": 100,
-            "requestsPerHour": 2500,
-            "dailyBudget": 25
+            "requestsPerMinute": 480,
+            "requestsPerHour": 4000000,
+            "dailyBudget": 50
           }
         },
-        "grok-1.5": {
-          "name": "Grok-1.5",
-          "contextWindow": 16384,
+        "grok-4-fast-non-reasoning": {
+          "name": "Grok 4 Fast Non-Reasoning",
+          "contextWindow": 2000000,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.0002,
+          "outputCostPer1k": 0.0005,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "fastest-inference",
+            "large-context",
+            "cost-effective"
+          ],
+          "routing": {
+            "priority": 2,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 480,
+            "requestsPerHour": 4000000,
+            "dailyBudget": 50
+          }
+        },
+        "grok-4-0709": {
+          "name": "Grok 4 0709",
+          "contextWindow": 256000,
           "maxTokens": 4096,
           "inputCostPer1k": 0.003,
-          "outputCostPer1k": 0.003,
+          "outputCostPer1k": 0.015,
           "capabilities": [
             "text-generation",
             "code-generation",
             "conversation",
             "analysis",
-            "reasoning"
+            "reasoning",
+            "planning"
           ],
           "strengths": [
-            "code-generation",
-            "reasoning",
-            "long-context"
+            "high-quality",
+            "advanced-reasoning",
+            "large-context"
           ],
           "routing": {
-            "priority": 7,
+            "priority": 3,
             "fallback": true,
-            "loadBalance": true
+            "loadBalance": false
           },
           "limits": {
-            "requestsPerMinute": 80,
-            "requestsPerHour": 2000,
-            "dailyBudget": 35
+            "requestsPerMinute": 480,
+            "requestsPerHour": 2000000,
+            "dailyBudget": 100
           }
         },
         "grok-code-fast-1": {
           "name": "Grok Code Fast 1",
-          "contextWindow": 8192,
+          "contextWindow": 256000,
           "maxTokens": 4096,
-          "inputCostPer1k": 0.001,
-          "outputCostPer1k": 0.001,
+          "inputCostPer1k": 0.0002,
+          "outputCostPer1k": 0.0015,
           "capabilities": [
             "text-generation",
             "code-generation",
@@ -447,14 +565,131 @@
             "cost-effective"
           ],
           "routing": {
-            "priority": 1,
+            "priority": 4,
             "fallback": true,
             "loadBalance": true
           },
           "limits": {
-            "requestsPerMinute": 200,
-            "requestsPerHour": 5000,
+            "requestsPerMinute": 480,
+            "requestsPerHour": 2000000,
             "dailyBudget": 25
+          }
+        },
+        "grok-3": {
+          "name": "Grok 3",
+          "contextWindow": 131072,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.003,
+          "outputCostPer1k": 0.015,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis",
+            "reasoning"
+          ],
+          "strengths": [
+            "high-quality",
+            "advanced-reasoning",
+            "reliable"
+          ],
+          "routing": {
+            "priority": 5,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 600,
+            "requestsPerHour": 1000,
+            "dailyBudget": 100
+          }
+        },
+        "grok-3-mini": {
+          "name": "Grok 3 Mini",
+          "contextWindow": 131072,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.0003,
+          "outputCostPer1k": 0.0005,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis"
+          ],
+          "strengths": [
+            "fast-inference",
+            "cost-effective",
+            "efficient"
+          ],
+          "routing": {
+            "priority": 6,
+            "fallback": true,
+            "loadBalance": true
+          },
+          "limits": {
+            "requestsPerMinute": 480,
+            "requestsPerHour": 1000,
+            "dailyBudget": 20
+          }
+        },
+        "grok-2-vision-1212us-east-1": {
+          "name": "Grok 2 Vision US East",
+          "contextWindow": 32768,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.002,
+          "outputCostPer1k": 0.01,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis",
+            "vision",
+            "multimodal"
+          ],
+          "strengths": [
+            "vision-capabilities",
+            "multimodal",
+            "us-east-performance"
+          ],
+          "routing": {
+            "priority": 7,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 600,
+            "requestsPerHour": 1000,
+            "dailyBudget": 75
+          }
+        },
+        "grok-2-vision-1212eu-west-1": {
+          "name": "Grok 2 Vision EU West",
+          "contextWindow": 32768,
+          "maxTokens": 4096,
+          "inputCostPer1k": 0.002,
+          "outputCostPer1k": 0.01,
+          "capabilities": [
+            "text-generation",
+            "code-generation",
+            "conversation",
+            "analysis",
+            "vision",
+            "multimodal"
+          ],
+          "strengths": [
+            "vision-capabilities",
+            "multimodal",
+            "eu-west-performance"
+          ],
+          "routing": {
+            "priority": 8,
+            "fallback": true,
+            "loadBalance": false
+          },
+          "limits": {
+            "requestsPerMinute": 50,
+            "requestsPerHour": 1000,
+            "dailyBudget": 75
           }
         }
       }

@@ -11,12 +11,26 @@ export class OpenAIService {
   }
 
   async generateCode(prompt: string, model?: string) {
-    const completion = await this.openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: model || 'gpt-4o', // GPT-5 Codex equivalent
-    });
+    const modelName = model || 'gpt-4o';
 
-    return completion.choices[0]?.message?.content || '';
+    console.log('[openai] generateCode called with model:', modelName);
+    console.log('[openai] API key is available, making request to OpenAI API');
+    console.log('[openai] Prompt length:', prompt.length);
+
+    try {
+      const completion = await this.openai.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: modelName,
+        max_tokens: 2048,
+        temperature: 0.7
+      });
+
+      console.log('[openai] Request successful, response received');
+      return completion.choices[0]?.message?.content || '';
+    } catch (error) {
+      console.error('[openai] API request failed:', error);
+      throw error;
+    }
   }
 
   async generateWithModel(prompt: string, modelConfig: ModelConfig): Promise<string> {
@@ -27,6 +41,6 @@ export class OpenAIService {
   }
 
   getAvailableModels(): string[] {
-    return ['gpt-4o', 'gpt-4'];
+    return ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'];
   }
 }

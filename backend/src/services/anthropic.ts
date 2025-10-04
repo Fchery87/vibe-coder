@@ -15,7 +15,11 @@ export class AnthropicService implements LLMProvider {
   }
 
   async generateCode(prompt: string, model?: string): Promise<string> {
-    const modelName = model || 'claude-3-sonnet-20240229';
+    const modelName = model || 'claude-3-5-sonnet-20241022';
+
+    console.log('[anthropic] generateCode called with model:', modelName);
+    console.log('[anthropic] API key is available, making request to Anthropic API');
+    console.log('[anthropic] Prompt length:', prompt.length);
 
     const response = await fetch(`${this.apiBaseUrl}/messages`, {
       method: 'POST',
@@ -48,13 +52,13 @@ export class AnthropicService implements LLMProvider {
   async generateWithModel(prompt: string, modelConfig: ModelConfig): Promise<string> {
     // Map our internal model names to Anthropic's model names
     const modelMapping: { [key: string]: string } = {
+      'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
       'claude-3-opus': 'claude-3-opus-20240229',
       'claude-3-sonnet': 'claude-3-sonnet-20240229',
-      'claude-3-haiku': 'claude-3-haiku-20240307',
-      'claude-3.5-sonnet': 'claude-3-5-sonnet-20240620'
+      'claude-3-haiku': 'claude-3-haiku-20240307'
     };
 
-    const modelName = modelMapping[modelConfig.name.toLowerCase()] || 'claude-3-sonnet-20240229';
+    const modelName = modelMapping[modelConfig.name.toLowerCase()] || 'claude-3-5-sonnet-20241022';
 
     const response = await fetch(`${this.apiBaseUrl}/messages`, {
       method: 'POST',
@@ -86,10 +90,10 @@ export class AnthropicService implements LLMProvider {
 
   getAvailableModels(): string[] {
     return [
+      'claude-3-5-sonnet-20241022',
       'claude-3-opus-20240229',
       'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307',
-      'claude-3-5-sonnet-20240620'
+      'claude-3-haiku-20240307'
     ];
   }
 }

@@ -16,7 +16,7 @@ export class XAIService {
     }
   }
 
-  async generateCode(prompt: string, model: string = 'grok-1'): Promise<string> {
+  async generateCode(prompt: string, model: string = 'grok-4-fast-reasoning'): Promise<string> {
     console.log('[xai] generateCode called with model:', model, 'prompt length:', prompt.length);
 
     if (!this.apiKey) {
@@ -73,16 +73,30 @@ export class XAIService {
   async generateWithModel(prompt: string, modelConfig: ModelConfig): Promise<string> {
     // Map model names to xAI API model names
     const modelMap: { [key: string]: string } = {
-      'grok-1': 'grok-1',
-      'grok-1.5': 'grok-1.5',
-      'grok-code-fast-1': 'grok-code-fast-1' // Use the correct model name as shown in xAI console
+      'grok-4-fast-reasoning': 'grok-4-fast-reasoning',
+      'grok-4-fast-non-reasoning': 'grok-4-fast-non-reasoning',
+      'grok-4-0709': 'grok-4-0709',
+      'grok-code-fast-1': 'grok-code-fast-1',
+      'grok-3': 'grok-3',
+      'grok-3-mini': 'grok-3-mini',
+      'grok-2-vision-1212us-east-1': 'grok-2-vision-1212us-east-1',
+      'grok-2-vision-1212eu-west-1': 'grok-2-vision-1212eu-west-1'
     };
-    const apiModel = modelMap[modelConfig.name.toLowerCase()] || 'grok-1';
+    const apiModel = modelMap[modelConfig.name.toLowerCase()] || 'grok-4-fast-reasoning';
     return this.generateCode(prompt, apiModel);
   }
 
   getAvailableModels(): string[] {
-    return ['grok-1', 'grok-1.5', 'grok-code-fast-1'];
+    return [
+      'grok-4-fast-reasoning',
+      'grok-4-fast-non-reasoning',
+      'grok-4-0709',
+      'grok-code-fast-1',
+      'grok-3',
+      'grok-3-mini',
+      'grok-2-vision-1212us-east-1',
+      'grok-2-vision-1212eu-west-1'
+    ];
   }
 }
 "" 
