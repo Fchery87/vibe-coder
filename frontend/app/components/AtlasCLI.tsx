@@ -26,31 +26,23 @@ export default function AtlasCLI({ onCommand, isGenerating, generatedCode, execu
       command: 'atlas --help',
       output: `Atlas CLI - Local Autonomous Agent Interface
 
-Quick Start:
+🚀 Quick Start:
   Just type what you want to build and press Enter!
-  No need for "atlas generate" - Atlas understands natural language.
+  Atlas understands natural language - no commands needed!
 
-Available Commands:
-  <your prompt>              Generate code from any prompt
-  atlas explain <file>        Explain code in specified file
-  atlas refactor <file>       Refactor code for better maintainability
-  atlas test <file>          Generate tests for specified file
-  atlas optimize <file>       Optimize code performance
-  atlas export <platform>     Export project (expo, flutter)
-  atlas checkpoint <name>     Create project checkpoint
-  atlas restore <name>        Restore from checkpoint
-  atlas quality               Run code quality analysis
-  atlas clear                 Clear terminal history
-  atlas status                Show current project status
-
-Examples:
+💡 Examples:
   "Create a React todo app"
   "Build a weather dashboard"
   "Make a chat component with emoji reactions"
-  atlas explain @src/App.js
-  atlas export expo
+  "Design a login form with validation"
+  "Create a simple ping pong game"
 
-Just type your request and Atlas will start generating!`,
+🔧 Advanced Commands:
+  Type /commands to see all available commands
+
+🎯 Tip: Start simple! Atlas learns from your requests and generates better code over time.
+
+Ready to build something amazing? Just describe it! ✨`,
       timestamp: new Date(),
       type: 'info'
     }
@@ -94,8 +86,8 @@ Just type your request and Atlas will start generating!`,
     if (executionResult) {
       const output = executionResult.success
         ? `✅ Tests passed: ${executionResult.output}`
-        : `❌ Tests failed: ${executionResult.output}`;
-      addCommand('atlas test', output, executionResult.success ? 'success' : 'error');
+        : `⚠️ Tests failed: ${executionResult.output} (Code still generated - you can review and fix if needed)`;
+      addCommand('atlas test', output, executionResult.success ? 'success' : 'info');
     }
   }, [executionResult]);
 
@@ -162,15 +154,20 @@ Just type your request and Atlas will start generating!`,
       case 'help':
         addCommand(cmd, getHelpText(), 'info');
         break;
+      case '/commands':
+        addCommand(cmd, getCommandsList(), 'info');
+        break;
       case 'history':
         showCommandHistory();
         break;
       default:
         // If command doesn't match any specific atlas subcommand, treat as direct prompt
-        if (cmd.length > 2) {
+        if (cmd.length > 2 && !cmd.startsWith('/')) {
           await onCommand(cmd);
+        } else if (cmd.startsWith('/')) {
+          addCommand(cmd, `Command not found: ${baseCommand}. Type /commands to see all available commands.`, 'error');
         } else {
-          addCommand(cmd, `Command not found: ${baseCommand}. Type 'help' for available commands, or just describe what you want to build!`, 'error');
+          addCommand(cmd, `Command not found: ${baseCommand}. Type /help for quick start, or just describe what you want to build!`, 'error');
         }
     }
   };
@@ -285,32 +282,60 @@ Just type your request and Atlas will start generating!`,
   const getHelpText = () => {
     return `Atlas CLI - Local Autonomous Agent Interface
 
-Quick Start:
+🚀 Quick Start:
   Just type what you want to build and press Enter!
-  No need for "atlas generate" - Atlas understands natural language.
+  Atlas understands natural language - no commands needed!
 
-Available Commands:
-  <your prompt>              Generate code from any prompt
+💡 Examples:
+  "Create a React todo app"
+  "Build a weather dashboard"
+  "Make a chat component with emoji reactions"
+  "Design a login form with validation"
+  "Create a simple ping pong game"
+
+🔧 Advanced Commands:
+  Type /commands to see all available commands
+
+🎯 Tip: Start simple! Atlas learns from your requests and generates better code over time.
+
+Ready to build something amazing? Just describe it! ✨`;
+  };
+
+  const getCommandsList = () => {
+    return `Atlas CLI - All Available Commands
+
+🎯 Natural Language (Primary):
+  <any prompt>               Generate code from natural language
+
+🔧 File Operations:
   atlas explain <file>        Explain code in specified file
   atlas refactor <file>       Refactor code for better maintainability
   atlas test <file>          Generate tests for specified file
   atlas optimize <file>       Optimize code performance
+
+📦 Project Management:
   atlas export <platform>     Export project (expo, flutter)
   atlas checkpoint <name>     Create project checkpoint
   atlas restore <name>        Restore from checkpoint
   atlas quality               Run code quality analysis
   atlas status                Show current project status
+
+🛠️ Utility Commands:
   atlas clear                 Clear terminal history
-  atlas help                  Show this help message
+  atlas help                  Show quick start guide
+  /help                       Show quick start guide
+  /commands                   Show this commands list
+
+💡 Pro Tips:
+  • Use @filename to reference specific files
+  • Be specific about frameworks and requirements
+  • Atlas learns from your coding style over time
 
 Examples:
-  "Create a React todo app"
-  "Build a weather dashboard"
-  "Make a chat component with emoji reactions"
-  atlas explain @src/App.js
-  atlas export expo
-
-Just type your request and Atlas will start generating!`;
+  "Create a React todo app with dark mode"
+  "Build a weather app using Vue.js"
+  atlas explain @src/components/Button.js
+  atlas export expo`;
   };
 
   const showCommandHistory = () => {
@@ -475,7 +500,7 @@ Environment: Local Execution`;
       {/* CLI Footer */}
       <div className="p-2 border-t border-slate-700/50 bg-slate-800/30 flex-shrink-0">
         <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>↑↓ for history • Tab for autocomplete • Just type your request!</span>
+          <span>↑↓ for history • Tab for autocomplete • /commands to see all commands</span>
           <span>Atlas is ready to build</span>
         </div>
       </div>
