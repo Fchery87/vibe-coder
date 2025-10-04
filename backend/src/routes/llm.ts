@@ -16,7 +16,7 @@ import { DiffValidationService } from '../services/diff-validation-service';
 const router = Router();
 const modelRegistry = new ModelRegistryService();
 const routingService = new RoutingService(modelRegistry);
-const providerManager = new ProviderManager(modelRegistry);
+const providerManager = new ProviderManager(); // Temporarily disable cost optimizer
 const budgetManager = new BudgetManager(modelRegistry);
 const sandboxService = new SandboxService();
 const gitService = new GitService('.');
@@ -141,9 +141,41 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
     }
 
     // Generate code using the selected provider and model
-    const result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig);
+    let result;
+    let isMock = false;
+    try {
+      console.log('[/llm/generate] calling providerManager.generateCode');
+      result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig);
+      console.log('[/llm/generate] provider call succeeded');
+    } catch (error) {
+      console.log('[/llm/generate] provider call failed, using mock response for demo', error instanceof Error ? error.message : String(error));
+      isMock = true;
 
-    console.log('[/llm/generate] provider returned response', {
+      // Mock response for demo purposes when APIs are not available
+      if (targetProvider === 'ollama') {
+        result = `// Mock response: Ollama is not running locally
+// To use Ollama, install and start the Ollama service first
+function addNumbers(a, b) {
+  return a + b;
+}
+
+console.log(addNumbers(5, 3)); // Output: 8`;
+      } else if (targetProvider === 'xai') {
+        result = `// Mock response: XAI API credits exhausted
+// To use XAI, add credits to your account
+const greetUser = (name) => {
+  return \`Hello, \${name}! Welcome to the application.\`;
+};
+
+console.log(greetUser("World")); // Output: Hello, World! Welcome to the application.`;
+      } else {
+        result = `// Mock response: API service unavailable
+// Generated code would appear here when the service is available
+console.log("Hello from AI-generated code!");`;
+      }
+    }
+
+    console.log('[/llm/generate] using response', {
       resultType: typeof result,
       resultLength: result ? result.length : 0
     });
@@ -180,7 +212,8 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
         provider: targetProvider,
         estimatedTokens,
         estimatedCost,
-        routingMode: routingMode || 'manual'
+        routingMode: routingMode || 'manual',
+        mock: isMock
       },
       budget: {
         alerts: newAlerts,

@@ -85,6 +85,9 @@ export default function Home() {
     const startTime = new Date();
     setIsGenerating(true);
 
+    // Immediately switch to editor view to show generation is starting
+    setActiveView('editor');
+
     // Initialize run metadata
     setRunMetadata({
       tokens: 0,
@@ -138,13 +141,13 @@ export default function Home() {
         throw new Error('Failed to generate code');
       }
 
+      const data = await res.json();
+
       setSandboxLogs(prev => [...prev, {
         type: 'success',
-        message: `✅ AI model responded successfully`,
+        message: `✅ ${data.metadata?.mock ? 'Demo mode: Using mock response' : 'AI model responded successfully'}`,
         timestamp: new Date()
       }]);
-
-      const data = await res.json();
       setGeneratedCode(data.code);
       setOriginalGeneratedCode(data.code); // Store original for diff comparison
 
@@ -165,8 +168,8 @@ export default function Home() {
         timestamp: new Date()
       }]);
 
-      // Test the generated code in sandbox
-      if (data.code) {
+      // Test the generated code in sandbox (skip for mock responses)
+      if (data.code && !data.metadata?.mock) {
         setSandboxLogs(prev => [...prev, {
           type: 'info',
           message: `🧪 Running code validation and tests...`,
@@ -174,6 +177,12 @@ export default function Home() {
         }]);
 
         await testGeneratedCode(data.code);
+      } else if (data.metadata?.mock) {
+        setSandboxLogs(prev => [...prev, {
+          type: 'info',
+          message: `⏭️ Skipping sandbox tests for demo response`,
+          timestamp: new Date()
+        }]);
       }
 
       setSandboxLogs(prev => [...prev, {
@@ -1101,7 +1110,7 @@ export default function Home() {
                 {/* Editor Tab Content */}
                 <TabsContent value="editor" className="flex-1 min-h-0 m-0">
                   <CodeEditor
-                    value={generatedCode}
+                    value={isGenerating && !generatedCode ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!" : generatedCode}
                     onChange={(val) => val !== undefined && setGeneratedCode(val)}
                     originalValue={originalGeneratedCode}
                   />

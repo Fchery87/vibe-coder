@@ -7,23 +7,27 @@ export class XAIService {
   constructor() {
     this.apiKey = process.env.XAI_API_KEY || '';
     this.baseUrl = 'https://api.x.ai/v1';
+
+    // Debug logging for API key loading
+    console.log('[xai] API Key loaded:', this.apiKey ? 'YES' : 'NO');
+    console.log('[xai] API Key length:', this.apiKey.length);
+    if (this.apiKey) {
+      console.log('[xai] API Key starts with:', this.apiKey.substring(0, 10) + '...');
+    }
   }
 
   async generateCode(prompt: string, model: string = 'grok-1'): Promise<string> {
+    console.log('[xai] generateCode called with model:', model, 'prompt length:', prompt.length);
+
     if (!this.apiKey) {
+      console.log('[xai] ERROR: XAI_API_KEY is not set!');
       throw new Error('XAI_API_KEY environment variable is not set');
     }
 
+    console.log('[xai] API key is available, making request to xAI API');
+
     try {
-      console.log('[xai] sending request', {
-        model,
-        promptLength: prompt.length
-      });
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
-
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -33,45 +37,35 @@ export class XAIService {
           model: model,
           messages: [
             {
-              role: 'system',
-              content: 'You are Grok, a helpful and maximally truthful AI built by xAI. You are helpful, truthful, and you do not shy away from politically incorrect claims if they are substantiated.'
-            },
-            {
               role: 'user',
               content: prompt
             }
           ],
           max_tokens: 4096,
           temperature: 0.7
-        }),
-        signal: controller.signal
+        })
       });
 
-      clearTimeout(timeout);
+      console.log('[xai] Response status:', response.status);
 
       const data = await response.json();
 
-      // Check for xAI API errors in the response body
       if (data.error) {
-        throw new Error(`xAI API error: ${data.error}${data.code ? ` (${data.code})` : ''}`);
+        console.log('[xai] API error:', data.error);
+        throw new Error(`xAI API error: ${data.error}`);
       }
 
       if (!response.ok) {
-        const errText = JSON.stringify(data);
-        throw new Error(`xAI API error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
+        throw new Error(`xAI API error: ${response.status} ${response.statusText}`);
       }
 
-      console.log('[xai] received response', {
-        hasChoices: Array.isArray(data.choices),
-        firstChoiceLength: data.choices?.[0]?.message?.content?.length || 0
-      });
-      return data.choices?.[0]?.message?.content || '';
+      const content = data.choices?.[0]?.message?.content;
+      console.log('[xai] Generated content length:', content?.length || 0);
+
+      return content || '';
+
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error('xAI service timeout reached');
-        throw new Error('xAI request timed out');
-      }
-      console.error('xAI service error:', error);
+      console.error('[xai] Request failed:', error);
       throw error;
     }
   }
