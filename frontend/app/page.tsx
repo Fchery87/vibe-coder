@@ -6,6 +6,7 @@ import CodeEditor from "@/components/Editor";
 import FileTree from "@/components/FileTree";
 import PreviewPanel from "@/components/PreviewPanel";
 import CommandPalette from "@/components/CommandPalette";
+import AtlasCLI from "@/components/AtlasCLI";
 import { ToastContainer, useToast } from "@/components/Toast";
 import InlineDiff from "@/components/InlineDiff";
 import ModelFeedbackLoop from "@/components/ModelFeedbackLoop";
@@ -590,6 +591,45 @@ export default function Home() {
     }
   };
 
+  // Atlas CLI Event Listeners
+  useEffect(() => {
+    const handleAtlasExport = (event: any) => {
+      if (event.detail === 'expo') {
+        exportToExpo();
+      } else if (event.detail === 'flutter') {
+        exportToFlutter();
+      }
+    };
+
+    const handleAtlasCheckpoint = (event: any) => {
+      createCheckpoint(event.detail, 'Atlas CLI-generated checkpoint');
+    };
+
+    const handleAtlasRestore = (event: any) => {
+      // Find checkpoint by name and restore
+      const checkpoint = checkpoints.find(c => c.name === event.detail);
+      if (checkpoint) {
+        restoreCheckpoint(checkpoint);
+      }
+    };
+
+    const handleAtlasQualityCheck = () => {
+      runQualityCheck();
+    };
+
+    document.addEventListener('atlas-export', handleAtlasExport);
+    document.addEventListener('atlas-checkpoint', handleAtlasCheckpoint);
+    document.addEventListener('atlas-restore', handleAtlasRestore);
+    document.addEventListener('atlas-quality-check', handleAtlasQualityCheck);
+
+    return () => {
+      document.removeEventListener('atlas-export', handleAtlasExport);
+      document.removeEventListener('atlas-checkpoint', handleAtlasCheckpoint);
+      document.removeEventListener('atlas-restore', handleAtlasRestore);
+      document.removeEventListener('atlas-quality-check', handleAtlasQualityCheck);
+    };
+  }, [checkpoints]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -921,16 +961,17 @@ export default function Home() {
         <div className="flex-1 flex flex-col min-h-0">
           {/* Responsive Layout: Equal-width columns on large screens, stacked on smaller screens */}
           <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 min-h-0 gap-0 xl:gap-0">
-            {/* AI Chat Column */}
+            {/* Atlas CLI Column */}
             <div className="flex flex-col min-h-0 xl:border-r border-slate-700/50">
-              {/* AI Chat Header */}
+              {/* CLI Header */}
               <div className="p-3 md:p-4 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
                 <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
-                  <svg className="w-4 h-4 md:w-5 md:h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span className="hidden sm:inline">AI Chat</span>
-                  <span className="sm:hidden">Chat</span>
+                  <span className="hidden sm:inline">Atlas CLI</span>
+                  <span className="sm:hidden">CLI</span>
+                  <span className="text-xs text-green-400 bg-green-400/20 px-2 py-1 rounded-full">Genie Agent</span>
                 </h2>
               </div>
 
@@ -946,104 +987,15 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Chat Messages Area */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-auto p-3 md:p-4 space-y-3 md:space-y-4 min-h-0">
-                  {chatMessages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-gray-400 px-4">
-                      <div className="text-center max-w-sm">
-                        <div className="w-12 h-12 md:w-16 md:h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-6 h-6 md:w-8 md:h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
-                        </div>
-                        <p className="text-sm md:text-base">Start a conversation with AI</p>
-                        <p className="text-xs text-gray-500 mt-1">Describe what you want to build</p>
-                      </div>
-                    </div>
-                  ) : (
-                    chatMessages.map((message, index) => (
-                      <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-3 md:mb-4`}>
-                        <div className={`max-w-[90%] md:max-w-[85%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-                          {/* Message Header */}
-                          <div className={`flex items-center gap-2 mb-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs ${
-                              message.role === 'user'
-                                ? 'bg-purple-500/20 text-purple-300'
-                                : 'bg-blue-500/20 text-blue-300'
-                            }`}>
-                              {message.role === 'user' ? (
-                                <>
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                  </svg>
-                                  <span className="hidden sm:inline">You</span>
-                                </>
-                              ) : (
-                                <>
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                  </svg>
-                                  <span className="hidden sm:inline">AI Assistant</span>
-                                  <span className="sm:hidden">AI</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Message Bubble */}
-                          <div className={`glass-panel p-3 md:p-4 rounded-2xl shadow-lg touch-manipulation ${
-                            message.role === 'user'
-                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                              : 'bg-slate-700/80 text-gray-200 border border-slate-600/50'
-                          }`}>
-                            <p className="text-sm leading-relaxed">{message.content}</p>
-
-                            {/* View File Button for Assistant Messages */}
-                            {message.role === 'assistant' && generatedCode && (
-                              <div className="flex items-center justify-end mt-3">
-                                <button
-                                  onClick={() => setActiveView('editor')}
-                                  className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded transition-colors"
-                                  title="View generated code in editor"
-                                >
-                                  View file
-                                </button>
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10">
-                              <span className="text-xs opacity-70">
-                                {message.timestamp.toLocaleTimeString()}
-                              </span>
-                              {message.role === 'assistant' && (
-                                <div className="flex items-center gap-1 text-xs opacity-70">
-                                  <span className="hidden sm:inline">Claude</span>
-                                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Inline Diff for AI responses with code */}
-                          {message.role === 'assistant' && generatedCode && (
-                            <InlineDiff
-                              originalCode={originalGeneratedCode || ''}
-                              modifiedCode={generatedCode}
-                              filename="generated.js"
-                              language="javascript"
-                            />
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Chat Input */}
-                <div className="border-t border-slate-700/50 p-3 md:p-4 bg-slate-800/50 flex-shrink-0">
-                  <PromptInput onSubmit={handleChatSubmit} />
-                </div>
+              {/* Atlas CLI Interface */}
+              <div className="flex-1 min-h-0">
+                <AtlasCLI
+                  onCommand={handleChatSubmit}
+                  isGenerating={isGenerating}
+                  generatedCode={generatedCode}
+                  executionResult={executionResult}
+                  sandboxLogs={sandboxLogs}
+                />
               </div>
             </div>
 
