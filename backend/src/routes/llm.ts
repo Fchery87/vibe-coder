@@ -78,7 +78,7 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
       if (provider === 'xai') targetModel = 'grok-code-fast-1';
       else if (provider === 'openai') targetModel = 'gpt-4o';
       else if (provider === 'anthropic') targetModel = 'claude-3.5-sonnet';
-      else if (provider === 'google') targetModel = 'gemini-2.5';
+      else if (provider === 'google') targetModel = 'gemini-1.5-pro';
       else targetModel = 'gpt-4o';
     } else if (routingMode && routingMode !== 'manual') {
       // 3) Otherwise use routing service
@@ -143,6 +143,7 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
     // Generate code using the selected provider and model
     let result;
     let isMock = false;
+    let errorMessage: string | undefined;
     try {
       console.log('[/llm/generate] calling providerManager.generateCode');
       result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig);
@@ -150,6 +151,7 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
     } catch (error) {
       console.log('[/llm/generate] provider call failed, using mock response for demo', error instanceof Error ? error.message : String(error));
       isMock = true;
+      errorMessage = error instanceof Error ? error.message : String(error);
 
       // Mock response for demo purposes when APIs are not available
       if (targetProvider === 'ollama') {
@@ -253,7 +255,8 @@ console.log("Hello from AI-generated code!");`;
         estimatedTokens,
         estimatedCost,
         routingMode: routingMode || 'manual',
-        mock: isMock
+        mock: isMock,
+        error: isMock ? errorMessage : undefined
       },
       budget: {
         alerts: newAlerts,
@@ -1228,4 +1231,4 @@ router.post('/workflow/generate', async (req: Request, res: Response) => {
 });
 
 export default router;
-"" 
+

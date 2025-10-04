@@ -20,9 +20,15 @@ interface PreviewPanelProps {
     error?: string;
     executionTime: number;
   };
+  metadata?: {
+    provider?: string;
+    model?: string;
+    mock?: boolean;
+    error?: string;
+  };
 }
 
-export default function PreviewPanel({ generatedCode, sandboxLogs = [], executionResult }: PreviewPanelProps) {
+export default function PreviewPanel({ generatedCode, sandboxLogs = [], executionResult, metadata }: PreviewPanelProps) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -511,3 +517,5 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
     </div>
   );
 }
+
+

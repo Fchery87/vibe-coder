@@ -1,0 +1,54 @@
+*** Begin Patch
+*** Update File: backend/src/services/google.ts
+@@
+-  private apiBaseUrl: string;
++  private apiBaseUrl: string;
+@@
+-    this.apiKey = process.env.GOOGLE_API_KEY || '';
+-    this.apiBaseUrl = 'https://generativelanguage.googleapis.com/v1';
++    this.apiKey = process.env.GOOGLE_API_KEY || '';
++    // Use v1beta for wider Gemini 1.5 availability; some keys lack v1 access
++    this.apiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+@@
+-  async generateCode(prompt: string, model?: string): Promise<string> {
+-    const modelName = model || 'gemini-1.5-pro';
++  async generateCode(prompt: string, model?: string): Promise<string> {
++    const modelName = model || 'gemini-1.5-pro';
+@@
+-    if (!response.ok) {
+-      const error = await response.text();
+-      throw new Error(Google AI API error:  );
++    if (!response.ok) {
++      const error = await response.text();
++      throw new Error(Google AI API error:  );
+     }
+@@
+-  async generateWithModel(prompt: string, modelConfig: ModelConfig): Promise<string> {
+-    // Map our internal model names to Google's model names
+-    const modelMapping: { [key: string]: string } = {
+-      'gemini-1.5-pro': 'gemini-1.5-pro',
+-      'gemini-1.5-flash': 'gemini-1.5-flash'
+-    };
+-
+-    const modelName = modelMapping[modelConfig.name.toLowerCase()] || 'gemini-pro';
++  async generateWithModel(prompt: string, modelConfig: ModelConfig): Promise<string> {
++    // Map our internal model names to Google's model names
++    const nameKey = modelConfig.name.toLowerCase();
++    const modelMapping: { [key: string]: string } = {
++      'gemini-1.5-pro': 'gemini-1.5-pro',
++      'gemini-1.5-flash': 'gemini-1.5-flash',
++      // Back-compat aliases
++      'gemini-pro': 'gemini-pro',
++      'gemini-pro-1.5': 'gemini-1.5-pro'
++    };
++
++    const modelName = modelMapping[nameKey] || 'gemini-1.5-pro';
+@@
+-    if (!response.ok) {
+-      const error = await response.text();
+-      throw new Error(Google AI API error:  );
++    if (!response.ok) {
++      const error = await response.text();
++      throw new Error(Google AI API error:  );
+     }
+*** End Patch

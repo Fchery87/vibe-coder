@@ -1,11 +1,11 @@
+// Load environment variables from root .env.local
 import path from 'path';
+require('dotenv').config({ path: path.resolve(process.cwd(), '../.env.local') });
+
 import express from 'express';
 import cors from 'cors';
 import llmRouter from './routes/llm';
 import previewRouter from './routes/preview';
-
-// Load environment variables from root .env.local
-require('dotenv').config({ path: path.resolve(process.cwd(), '../.env.local') });
 
 const app = express();
 const port = 3001;
