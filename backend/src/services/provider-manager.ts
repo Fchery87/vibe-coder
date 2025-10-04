@@ -4,7 +4,6 @@ import { XAIService } from './xai';
 import { SupernovaService } from './supernova';
 import { AnthropicService } from './anthropic';
 import { GoogleService } from './google';
-import { OllamaService } from './ollama';
 import { CostOptimizationService } from './cost-optimization-service';
 
 export interface LLMProvider {
@@ -66,12 +65,7 @@ export class ProviderManager {
       this.providers.set('supernova', new SupernovaService());
     }
 
-    // Ollama service - local, no API key required
-    try {
-      this.providers.set('ollama', new OllamaService());
-    } catch (error) {
-      console.warn('Failed to initialize Ollama service:', error);
-    }
+    // Ollama service - removed as requested
 
     console.log(`Initialized providers: ${Array.from(this.providers.keys()).join(', ')}`);
   }
@@ -150,10 +144,6 @@ export class ProviderManager {
           if (process.env.SUPERNOVA_API_KEY) {
             provider = new SupernovaService();
           }
-          break;
-
-        case 'ollama':
-          provider = new OllamaService();
           break;
 
         default:
@@ -293,8 +283,6 @@ export class ProviderManager {
         return !!process.env.XAI_API_KEY;
       case 'supernova':
         return !!process.env.SUPERNOVA_API_KEY;
-      case 'ollama':
-        return true; // Local service, always available if instantiated
       default:
         return false;
     }

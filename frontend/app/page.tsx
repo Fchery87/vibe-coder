@@ -691,7 +691,6 @@ export default function Home() {
                     else if (p === 'openai') setSelectedModel('gpt-4o');
                     else if (p === 'anthropic') setSelectedModel('claude-3.5-sonnet');
                     else if (p === 'google') setSelectedModel('gemini-2.5');
-                    else if (p === 'ollama') setSelectedModel('codellama');
                     else setSelectedModel('');
                   }}
                   className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
@@ -701,7 +700,6 @@ export default function Home() {
                   <option value="anthropic">Anthropic</option>
                   <option value="google">Google</option>
                   <option value="xai">xAI</option>
-                  <option value="ollama">Ollama (Local)</option>
                 </select>
 
                 <span className="text-xs text-gray-400">Model:</span>
@@ -743,13 +741,6 @@ export default function Home() {
                     <>
                       <option value="gemini-2.5">gemini-2.5</option>
                       <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                    </>
-                  )}
-                  {activeProvider === 'ollama' && (
-                    <>
-                      <option value="llama2">llama2</option>
-                      <option value="codellama">codellama</option>
-                      <option value="mistral">mistral</option>
                     </>
                   )}
                 </select>
