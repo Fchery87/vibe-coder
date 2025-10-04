@@ -734,6 +734,7 @@ export default function Home() {
                       <option value="claude-3-opus-20240229">claude-3-opus</option>
                       <option value="claude-3-sonnet-20240229">claude-3-sonnet</option>
                       <option value="claude-3-haiku-20240307">claude-3-haiku</option>
+                      <option value="claude-3-5-haiku-20241022">claude-3.5-haiku</option>
                     </>
                   )}
                   {activeProvider === 'google' && (
