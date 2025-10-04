@@ -57,6 +57,12 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
   const { prompt, model, routingMode, capabilities, priority, maxCost, activeProvider, allowFailover } = req.body;
 
   try {
+    console.log('[/llm/generate] request received', {
+      routingMode,
+      model,
+      activeProvider,
+      promptLength: typeof prompt === 'string' ? prompt.length : 0
+    });
     let targetModel = 'gpt-4o';
     let targetProvider = 'openai';
 
@@ -92,6 +98,8 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
       // Add routing decision to response headers for debugging
       res.set('X-Routing-Decision', JSON.stringify(decision));
     }
+
+    console.log('[/llm/generate] resolved target', { targetProvider, targetModel });
 
     // Validate provider configuration
     const providerConfigured = providerManager.isProviderConfigured(targetProvider);
@@ -134,6 +142,11 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
 
     // Generate code using the selected provider and model
     const result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig);
+
+    console.log('[/llm/generate] provider returned response', {
+      resultType: typeof result,
+      resultLength: result ? result.length : 0
+    });
 
     if (!result) {
       throw new Error('No response generated from model');

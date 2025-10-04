@@ -14,6 +14,50 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
   const [hasChanges, setHasChanges] = useState(false);
   const [changeStats, setChangeStats] = useState({ additions: 0, deletions: 0 });
 
+  // Define the custom theme on mount
+  useEffect(() => {
+    // This will ensure the theme is defined when the component mounts
+    const defineTheme = () => {
+      if (typeof window !== 'undefined' && (window as any).monaco) {
+        (window as any).monaco.editor.defineTheme('vibe', vibeTheme);
+      }
+    };
+    defineTheme();
+  }, []);
+
+  // Custom theme matching site colors
+  const vibeTheme = {
+    base: 'vs-dark' as any,
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '64748b' }, // slate-500
+      { token: 'keyword', foreground: '8b5cf6' }, // purple-500
+      { token: 'string', foreground: '22c55e' }, // green-500
+      { token: 'number', foreground: 'f59e0b' }, // amber-500
+      { token: 'type', foreground: '06b6d4' }, // cyan-500
+      { token: 'class', foreground: '8b5cf6' }, // purple-500
+      { token: 'function', foreground: '3b82f6' }, // blue-500
+      { token: 'variable', foreground: 'f1f5f9' }, // slate-100
+    ],
+    colors: {
+      'editor.background': '#0f172a', // slate-900
+      'editor.foreground': '#f1f5f9', // slate-100
+      'editor.lineHighlightBackground': '#1e293b', // slate-800
+      'editor.selectionBackground': '#334155', // slate-700
+      'editorCursor.foreground': '#8b5cf6', // purple-500
+      'editorWhitespace.foreground': '#475569', // slate-600
+      'editorIndentGuide.background': '#334155', // slate-700
+      'editorIndentGuide.activeBackground': '#64748b', // slate-500
+      'editorWidget.background': '#1e293b', // slate-800
+      'editorWidget.border': '#334155', // slate-700
+      'editorSuggestWidget.background': '#1e293b', // slate-800
+      'editorSuggestWidget.border': '#334155', // slate-700
+      'editorSuggestWidget.selectedBackground': '#334155', // slate-700
+      'editorHoverWidget.background': '#1e293b', // slate-800
+      'editorHoverWidget.border': '#334155', // slate-700
+    }
+  };
+
   // Check if there are changes for diff view
   useEffect(() => {
     if (originalValue && value) {
@@ -157,8 +201,11 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
             defaultLanguage="typescript"
             value={value || "// Generated code will appear here...\n// Start by entering a prompt below!"}
             onChange={onChange}
-            theme="vs-dark"
+            theme="vibe"
             options={editorOptions}
+            beforeMount={(monaco) => {
+              monaco.editor.defineTheme('vibe', vibeTheme);
+            }}
           />
         ) : (
           <DiffEditor
@@ -166,8 +213,11 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
             language="typescript"
             original={originalValue || ""}
             modified={value || ""}
-            theme="vs-dark"
+            theme="vibe"
             options={diffOptions}
+            beforeMount={(monaco) => {
+              monaco.editor.defineTheme('vibe', vibeTheme);
+            }}
           />
         )}
       </div>

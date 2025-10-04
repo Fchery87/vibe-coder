@@ -10,6 +10,7 @@ import { ToastContainer, useToast } from "@/components/Toast";
 import InlineDiff from "@/components/InlineDiff";
 import ModelFeedbackLoop from "@/components/ModelFeedbackLoop";
 import ThemeToggle from "@/components/ThemeToggle";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface ProjectSnapshot {
   id: string;
@@ -45,11 +46,11 @@ export default function Home() {
     devServerUrl?: string;
     error?: string;
   } | null>(null);
-  const [routingMode, setRoutingMode] = useState<string>('orchestrated');
-  const [activeProvider, setActiveProvider] = useState<string>('xai');
-  const [selectedModel, setSelectedModel] = useState<string>('grok-code-fast-1');
+  const [routingMode, setRoutingMode] = useState<string>('single-model');
+  const [activeProvider, setActiveProvider] = useState<string>('ollama');
+  const [selectedModel, setSelectedModel] = useState<string>('codellama');
   const [allowFailover, setAllowFailover] = useState<boolean>(false);
-  const [singleModelMode, setSingleModelMode] = useState<boolean>(false);
+  const [singleModelMode, setSingleModelMode] = useState<boolean>(true);
   const [isRunningQualityCheck, setIsRunningQualityCheck] = useState(false);
   const [qualityReport, setQualityReport] = useState<{
     lint: any;
@@ -72,6 +73,7 @@ export default function Home() {
     startTime: Date;
   } | null>(null);
   const [activeTab, setActiveTab] = useState<'editor' | 'chat'>('chat');
+  const [activeView, setActiveView] = useState<'editor' | 'sandbox'>('sandbox');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [checkpoints, setCheckpoints] = useState<ProjectSnapshot[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -179,6 +181,9 @@ export default function Home() {
         message: `🎉 Code generation completed in ${duration.toFixed(1)}s`,
         timestamp: new Date()
       }]);
+
+      // Automatically switch to Editor view after generation
+      setActiveView('editor');
 
     } catch (err: any) {
       console.error('Generation error:', err);
@@ -677,6 +682,7 @@ export default function Home() {
                     else if (p === 'openai') setSelectedModel('gpt-4o');
                     else if (p === 'anthropic') setSelectedModel('claude-3.5-sonnet');
                     else if (p === 'google') setSelectedModel('gemini-2.5');
+                    else if (p === 'ollama') setSelectedModel('codellama');
                     else setSelectedModel('');
                   }}
                   className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
@@ -686,6 +692,7 @@ export default function Home() {
                   <option value="anthropic">Anthropic</option>
                   <option value="google">Google</option>
                   <option value="xai">xAI</option>
+                  <option value="ollama">Ollama (Local)</option>
                 </select>
 
                 <span className="text-xs text-gray-400">Model:</span>
@@ -727,6 +734,13 @@ export default function Home() {
                     <>
                       <option value="gemini-2.5">gemini-2.5</option>
                       <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                    </>
+                  )}
+                  {activeProvider === 'ollama' && (
+                    <>
+                      <option value="llama2">llama2</option>
+                      <option value="codellama">codellama</option>
+                      <option value="mistral">mistral</option>
                     </>
                   )}
                 </select>
@@ -828,17 +842,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Model Feedback Loop - Show during generation */}
-      {isGenerating && (
-        <div className="px-4 py-2 bg-slate-900/50 backdrop-blur-xl border-b border-slate-700/50">
-          <ModelFeedbackLoop
-            isActive={isGenerating}
-            onComplete={() => {
-              // Handle completion if needed
-            }}
-          />
-        </div>
-      )}
 
       {/* Main Layout - Responsive Grid */}
       <div className="flex flex-1 min-h-0">
@@ -930,6 +933,18 @@ export default function Home() {
                 </h2>
               </div>
 
+              {/* Generation Process - Show during generation */}
+              {isGenerating && (
+                <div className="px-3 md:px-4 py-2 bg-slate-900/50 backdrop-blur-xl border-b border-slate-700/50">
+                  <ModelFeedbackLoop
+                    isActive={isGenerating}
+                    onComplete={() => {
+                      setIsGenerating(false);
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Chat Messages Area */}
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex-1 overflow-auto p-3 md:p-4 space-y-3 md:space-y-4 min-h-0">
@@ -982,6 +997,20 @@ export default function Home() {
                               : 'bg-slate-700/80 text-gray-200 border border-slate-600/50'
                           }`}>
                             <p className="text-sm leading-relaxed">{message.content}</p>
+
+                            {/* View File Button for Assistant Messages */}
+                            {message.role === 'assistant' && generatedCode && (
+                              <div className="flex items-center justify-end mt-3">
+                                <button
+                                  onClick={() => setActiveView('editor')}
+                                  className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded transition-colors"
+                                  title="View generated code in editor"
+                                >
+                                  View file
+                                </button>
+                              </div>
+                            )}
+
                             <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10">
                               <span className="text-xs opacity-70">
                                 {message.timestamp.toLocaleTimeString()}
@@ -1017,48 +1046,76 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Sandbox Column */}
+            {/* Editor/Sandbox Column */}
             <div className="flex flex-col min-h-0 xl:border-l border-slate-700/50">
-              {/* Sandbox Header */}
-              <div className="p-3 md:p-4 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
-                    <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <span className="hidden sm:inline">Sandbox & Preview</span>
-                    <span className="sm:hidden">Sandbox</span>
-                  </h2>
+              <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'editor' | 'sandbox')} className="flex-1 flex flex-col min-h-0">
+                {/* Header with Tabs */}
+                <div className="p-3 md:p-4 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
+                  <TabsList className="grid w-full grid-cols-2 mb-2">
+                    <TabsTrigger value="editor">Editor</TabsTrigger>
+                    <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
+                  </TabsList>
 
-                  {/* Run Metadata Display - Desktop only */}
-                  {runMetadata && (
-                    <div className="hidden lg:flex items-center gap-2 text-xs">
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-400">Tokens:</span>
-                        <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
+                      {activeView === 'editor' ? (
+                        <>
+                          <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span className="hidden sm:inline">Code Editor</span>
+                          <span className="sm:hidden">Editor</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          <span className="hidden sm:inline">Sandbox & Preview</span>
+                          <span className="sm:hidden">Sandbox</span>
+                        </>
+                      )}
+                    </h2>
+
+                    {/* Run Metadata Display - Desktop only */}
+                    {runMetadata && activeView === 'sandbox' && (
+                      <div className="hidden lg:flex items-center gap-2 text-xs">
+                        <div className="flex items-center gap-1">
+                          <span className="text-gray-400">Tokens:</span>
+                          <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-gray-400">Cost:</span>
+                          <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-gray-400">Time:</span>
+                          <span className="text-blue-400 font-mono">{runMetadata.duration.toFixed(1)}s</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-400">Cost:</span>
-                        <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-400">Time:</span>
-                        <span className="text-blue-400 font-mono">{runMetadata.duration.toFixed(1)}s</span>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Sandbox Content */}
-              <div className="flex-1 min-h-0">
-                <PreviewPanel
-                  generatedCode={generatedCode}
-                  sandboxLogs={sandboxLogs}
-                  executionResult={executionResult}
-                />
-              </div>
+                {/* Editor Tab Content */}
+                <TabsContent value="editor" className="flex-1 min-h-0 m-0">
+                  <CodeEditor
+                    value={generatedCode}
+                    onChange={(val) => val !== undefined && setGeneratedCode(val)}
+                    originalValue={originalGeneratedCode}
+                  />
+                </TabsContent>
+
+                {/* Sandbox Tab Content */}
+                <TabsContent value="sandbox" className="flex-1 min-h-0 m-0">
+                  <PreviewPanel
+                    generatedCode={generatedCode}
+                    sandboxLogs={sandboxLogs}
+                    executionResult={executionResult}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
 
@@ -1096,7 +1153,7 @@ export default function Home() {
           )}
 
           {/* Terminal/Console with Status Feedback */}
-          <div className="h-32 md:h-40 glass-panel border-t border-white/10 transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col">
+          <div className="h-32 md:h-40 glass-panel border-t border-white/10 bg-slate-900 transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col">
             <div className="p-2 md:p-3 border-b border-white/10 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs md:text-sm font-semibold text-white flex items-center gap-2">

@@ -15,6 +15,14 @@ export class XAIService {
     }
 
     try {
+      console.log('[xai] sending request', {
+        model,
+        promptLength: prompt.length
+      });
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -35,18 +43,34 @@ export class XAIService {
           ],
           max_tokens: 4096,
           temperature: 0.7
-        })
+        }),
+        signal: controller.signal
       });
 
-      let data: any;
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        throw new Error(`xAI API error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
-      } else {
-        data = await response.json();
+      clearTimeout(timeout);
+
+      const data = await response.json();
+
+      // Check for xAI API errors in the response body
+      if (data.error) {
+        throw new Error(`xAI API error: ${data.error}${data.code ? ` (${data.code})` : ''}`);
       }
+
+      if (!response.ok) {
+        const errText = JSON.stringify(data);
+        throw new Error(`xAI API error: ${response.status} ${response.statusText}${errText ? ` - ${errText}` : ''}`);
+      }
+
+      console.log('[xai] received response', {
+        hasChoices: Array.isArray(data.choices),
+        firstChoiceLength: data.choices?.[0]?.message?.content?.length || 0
+      });
       return data.choices?.[0]?.message?.content || '';
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('xAI service timeout reached');
+        throw new Error('xAI request timed out');
+      }
       console.error('xAI service error:', error);
       throw error;
     }
@@ -67,3 +91,4 @@ export class XAIService {
     return ['grok-1', 'grok-1.5', 'grok-code-fast-1'];
   }
 }
+"" 
