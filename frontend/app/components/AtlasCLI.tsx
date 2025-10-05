@@ -1166,15 +1166,15 @@ Try: npm install, git status, ls, or any shell command`;
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 font-mono text-sm">
+    <div className="flex flex-col h-full bg-slate-900 font-mono" style={{ fontSize: 'var(--code-size)' }}>
       {/* CLI Header */}
       <div className="flex items-center justify-between p-3 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${cliActivity.isActive ? 'bg-blue-400 animate-pulse' : 'bg-green-400'}`}></div>
-          <span className="text-green-400 font-bold">Atlas CLI</span>
-          <span className="text-gray-400 text-xs">Genie Agent v1.0</span>
+          <span className="text-green-400 font-bold" style={{ fontSize: 'var(--h3-size)' }}>Atlas CLI</span>
+          <span className="text-gray-400 text-small">Genie Agent v1.0</span>
           {cliActivity.isActive && (
-            <span className="text-xs text-blue-400 bg-blue-400/20 px-2 py-1 rounded">
+            <span className="text-small text-blue-400 bg-blue-400/20 px-2 py-1 rounded">
               {cliActivity.currentTask}
             </span>
           )}
@@ -1183,7 +1183,7 @@ Try: npm install, git status, ls, or any shell command`;
           {/* Thinking Mode Toggle */}
           <button
             onClick={toggleThinkingMode}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-small font-medium transition-all ${
               isThinkMode
                 ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-400/30'
                 : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700 border border-gray-600/30'
@@ -1192,12 +1192,12 @@ Try: npm install, git status, ls, or any shell command`;
           >
             <span className="text-base">{isThinkMode ? '🧠' : '💭'}</span>
             <span>Thinking Mode</span>
-            <span className={`text-xs ${isThinkMode ? 'text-purple-400' : 'text-gray-500'}`}>
+            <span className={`text-small ${isThinkMode ? 'text-purple-400' : 'text-gray-500'}`}>
               {isThinkMode ? 'ON' : 'OFF'}
             </span>
           </button>
 
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+          <div className="flex items-center gap-2 text-small text-gray-400">
             <span>{commands.length} commands</span>
             <span>•</span>
             <span>{modifiedFiles.size} files modified</span>
@@ -1210,11 +1210,11 @@ Try: npm install, git status, ls, or any shell command`;
       {/* Modified Files Banner */}
       {modifiedFiles.size > 0 && (
         <div className="p-2 bg-blue-500/20 border-b border-blue-400/30">
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-small">
             <span className="text-blue-400">📁 Files modified by CLI:</span>
             <div className="flex gap-1 flex-wrap">
               {Array.from(modifiedFiles).map(file => (
-                <span key={file} className="bg-blue-400/20 text-blue-300 px-2 py-1 rounded">
+                <span key={file} className="bg-blue-400/20 text-blue-300 px-2 py-1 rounded text-small">
                   {file}
                 </span>
               ))}
@@ -1242,7 +1242,7 @@ Try: npm install, git status, ls, or any shell command`;
               <div className="flex items-start gap-2">
                 <span className="text-green-400 flex-shrink-0">$</span>
                 <span className="text-gray-200">{cmd.command}</span>
-                <span className="text-gray-500 text-xs ml-auto flex-shrink-0">
+                <span className="text-gray-500 text-small ml-auto flex-shrink-0">
                   {cmd.timestamp.toLocaleTimeString()}
                 </span>
               </div>
@@ -1255,7 +1255,7 @@ Try: npm install, git status, ls, or any shell command`;
                   {cmd.output}
                 </div>
                 {cmd.executionTime && (
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-small text-gray-500 mt-1">
                     Completed in {cmd.executionTime}ms
                   </div>
                 )}
@@ -1276,12 +1276,13 @@ Try: npm install, git status, ls, or any shell command`;
             onChange={(e) => setCurrentCommand(e.target.value)}
             onKeyDown={handleKeyDown}
             className="flex-1 bg-transparent border-0 outline-none text-gray-200 placeholder-gray-500"
+            style={{ fontSize: 'var(--code-size)' }}
             placeholder={isExecuting ? "Executing command..." : "Just describe what you want to build..."}
             disabled={isExecuting}
             spellCheck={false}
             autoComplete="off"
           />
-          <span className="text-gray-500 text-xs flex-shrink-0">
+          <span className="text-gray-500 text-small flex-shrink-0">
             {currentCommand.length > 0 && `${currentCommand.length} chars`}
           </span>
         </div>
@@ -1289,7 +1290,7 @@ Try: npm install, git status, ls, or any shell command`;
 
       {/* CLI Footer */}
       <div className="p-2 border-t border-slate-700/50 bg-slate-800/30 flex-shrink-0">
-        <div className="flex items-center justify-between text-xs text-gray-400">
+        <div className="flex items-center justify-between text-small text-gray-400">
           <span>↑↓ for history • Tab for autocomplete • Full local shell access</span>
           <span>Atlas is ready to execute</span>
         </div>
