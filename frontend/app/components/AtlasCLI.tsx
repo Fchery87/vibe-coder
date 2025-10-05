@@ -35,11 +35,11 @@ export default function AtlasCLI({
     {
       id: 'atlas-help-1',
       command: 'atlas --help',
-      output: `Atlas CLI - Local Autonomous Agent Interface
+      output: `Atlas CLI - AI Code Generator with Real-Time Streaming
 
 🚀 Quick Start:
   Just type what you want to build and press Enter!
-  Atlas understands natural language - no commands needed!
+  Code streams in REAL-TIME with proper formatting!
 
 💡 Examples:
   "Create a React todo app"
@@ -48,10 +48,14 @@ export default function AtlasCLI({
   "Design a login form with validation"
   "Create a simple ping pong game"
 
+⚡ Streaming Features:
+  ✓ Real-time code generation
+  ✓ Automatic code formatting
+  ✓ Multi-file support
+  ✓ Line-by-line streaming
+
 🔧 Advanced Commands:
   Type /commands to see all available commands
-
-🎯 Tip: Start simple! Atlas learns from your requests and generates better code over time.
 
 Ready to build something amazing? Just describe it! ✨`,
       timestamp: new Date(),
@@ -212,6 +216,8 @@ Ready to build something amazing? Just describe it! ✨`,
     const baseCommand = parts[0];
     const args = parts.slice(1);
 
+    console.log('[Atlas CLI] Parsing command:', { cmd, baseCommand, args });
+
     switch (baseCommand) {
       case 'atlas':
         await handleAtlasCommand(args);
@@ -257,27 +263,18 @@ Ready to build something amazing? Just describe it! ✨`,
       case 'execute':
         await executeShellCommand(args);
         break;
-      case 'stream':
-        // Handle standalone stream command (not atlas stream)
-        const prompt = args.join(' ');
-        if (!prompt) {
-          addCommand('stream', '❌ Error: Please provide a prompt. Example: stream "Create a React app"', 'error');
-          return;
-        }
-
-        // Check if streaming mode is active and start streaming directly
-        if ((window as any).startStreamingSession) {
-          console.log('Starting streaming session from standalone stream command with prompt:', prompt);
-          (window as any).startStreamingSession(prompt);
-          addCommand(`stream "${prompt}"`, '🚀 Starting real-time streaming code generation...', 'info');
-        } else {
-          addCommand('stream', '❌ Error: Streaming mode not active. Please enable streaming mode in the editor first.', 'error');
-        }
-        break;
       default:
         // If command doesn't match any specific atlas subcommand, treat as direct prompt
         if (cmd.length > 2 && !cmd.startsWith('/')) {
-          await onCommand(cmd);
+          // Always use streaming mode for prompts
+          if ((window as any).startStreamingSession) {
+            console.log('Starting streaming session with prompt:', cmd);
+            (window as any).startStreamingSession(cmd);
+            addCommand(cmd, '🚀 Generating code with real-time streaming...', 'info');
+          } else {
+            // Fallback to regular generation if streaming not available
+            await onCommand(cmd);
+          }
         } else if (cmd.startsWith('/')) {
           addCommand(cmd, `Command not found: ${baseCommand}. Type /commands to see all available commands.`, 'error');
         } else {
@@ -302,7 +299,14 @@ Ready to build something amazing? Just describe it! ✨`,
           addCommand('atlas generate', '❌ Error: Please provide a prompt. Example: atlas generate "Create a React todo app"', 'error');
           return;
         }
-        await onCommand(prompt);
+        // Always use streaming for generate
+        if ((window as any).startStreamingSession) {
+          console.log('Starting streaming session with prompt:', prompt);
+          (window as any).startStreamingSession(prompt);
+          addCommand(`atlas generate "${prompt}"`, '🚀 Generating code with real-time streaming...', 'info');
+        } else {
+          await onCommand(prompt);
+        }
         break;
 
       case 'explain':
@@ -380,23 +384,6 @@ Ready to build something amazing? Just describe it! ✨`,
         showProjectStatus();
         break;
 
-      case 'stream':
-        const streamPrompt = subArgs.join(' ');
-        if (!streamPrompt) {
-          addCommand('atlas stream', '❌ Error: Please provide a prompt for streaming. Example: atlas stream "Create a React app"', 'error');
-          return;
-        }
-
-        // Check if streaming mode is active and start streaming directly
-        if ((window as any).startStreamingSession) {
-          console.log('Starting streaming session from Atlas CLI with prompt:', streamPrompt);
-          (window as any).startStreamingSession(streamPrompt);
-          addCommand(`atlas stream "${streamPrompt}"`, '🚀 Starting real-time streaming code generation...', 'info');
-        } else {
-          addCommand('atlas stream', '❌ Error: Streaming mode not active. Please enable streaming mode in the editor first.', 'error');
-        }
-        break;
-
       case 'clear':
         setCommands([]);
         break;
@@ -415,7 +402,7 @@ Ready to build something amazing? Just describe it! ✨`,
 
 🚀 Quick Start:
   Just type what you want to build and press Enter!
-  Atlas understands natural language - no commands needed!
+  All code generation uses REAL-TIME STREAMING by default!
 
 💡 Examples:
   "Create a React todo app"
@@ -424,23 +411,23 @@ Ready to build something amazing? Just describe it! ✨`,
   "Design a login form with validation"
   "Create a simple ping pong game"
 
-🔧 Shell Commands:
-  env                    Show environment information
-  ls [directory]         List files and directories
-  cat <file>             Read and display file contents
-  run <script>           Run npm/yarn scripts (dev, build, test)
-  install <packages>     Install npm packages
-  git [command]          Execute git commands
-  shell <command>        Execute any shell command
+⚡ Code Generation (Streaming Enabled):
+  atlas generate <prompt>      Generate code from description
+  <any prompt>                 Direct prompts also work!
 
-⚡ Streaming Generation:
-  atlas stream <prompt>  Generate code with real-time streaming
-  stream <prompt>        Same as above (shorter version)
+🔧 Shell Commands:
+  env                          Show environment information
+  ls [directory]               List files and directories
+  cat <file>                   Read and display file contents
+  run <script>                 Run npm/yarn scripts (dev, build, test)
+  install <packages>           Install npm packages
+  git [command]                Execute git commands
+  shell <command>              Execute any shell command
 
 🔧 Advanced Commands:
   Type /commands to see all available commands
 
-🎯 Tip: Start simple! Atlas learns from your requests and generates better code over time.
+🎯 Tip: Code is generated line-by-line in real-time with proper formatting!
 
 Ready to build something amazing? Just describe it! ✨`;
   };
@@ -448,13 +435,14 @@ Ready to build something amazing? Just describe it! ✨`;
   const getCommandsList = () => {
     return `Atlas CLI - All Available Commands
 
-🎯 Natural Language (Primary):
-  <any prompt>               Generate code from natural language
+🎯 Natural Language (Primary - Streaming Enabled):
+  <any prompt>                Generate code from natural language
+  atlas generate <prompt>     Same as above (explicit)
 
 🔧 File Operations:
   atlas explain <file>        Explain code in specified file
   atlas refactor <file>       Refactor code for better maintainability
-  atlas test <file>          Generate tests for specified file
+  atlas test <file>           Generate tests for specified file
   atlas optimize <file>       Optimize code performance
 
 📦 Project Management:
@@ -473,19 +461,16 @@ Ready to build something amazing? Just describe it! ✨`;
   git [command]               Execute git commands (status, add, commit, etc.)
   shell <command>             Execute any shell command
 
-⚡ Streaming Generation:
-  atlas stream <prompt>       Generate code with real-time streaming
-  stream <prompt>             Same as above (shorter version)
-
 🛠️ Utility Commands:
   atlas clear                 Clear terminal history
   atlas help                  Show quick start guide
   /commands                   Show this commands list
 
 💡 Pro Tips:
+  • All code generation uses real-time streaming by default
   • Use @filename to reference specific files
   • Be specific about frameworks and requirements
-  • Atlas learns from your coding style over time
+  • Code appears line-by-line with proper formatting
 
 Examples:
   "Create a React todo app with dark mode"
@@ -760,8 +745,8 @@ Try: npm install, git status, ls, or any shell command`;
         e.preventDefault();
         // Auto-complete common commands
         const commonCommands = [
-          'atlas generate', 'atlas help', 'atlas status', 'atlas export', 'atlas stream',
-          'env', 'ls', 'cat', 'run', 'install', 'git status', 'shell', 'stream'
+          'atlas generate', 'atlas help', 'atlas status', 'atlas export',
+          'env', 'ls', 'cat', 'run', 'install', 'git status', 'shell'
         ];
         const matchingCommand = commonCommands.find(cmd => cmd.startsWith(currentCommand));
         if (matchingCommand) {

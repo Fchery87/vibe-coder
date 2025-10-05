@@ -1,4 +1,6 @@
-# Streaming Code Generation - Setup Guide
+# Real-Time Streaming Code Generation - Setup Guide
+
+**🎉 Streaming is now the DEFAULT mode!** All code generation happens in real-time.
 
 ## Quick Start
 
@@ -36,19 +38,20 @@ XAI_API_KEY=your-xai-key-here                # Needs credits
 
 **Recommended for testing**: Use Google API (Gemini) as it has free tier and is currently working!
 
-### 4. Enable Streaming Mode
-- In the Vibe Coder interface, click the **"⚡ Streaming Mode"** toggle in the editor header (next to Editor/Sandbox tabs)
+### 4. Generate Code (Streaming is Default!)
 
-### 5. Start Streaming
-- In Atlas CLI, use one of these commands:
-  ```bash
-  atlas stream "Create a React todo app"
-  stream "Build a ping pong game"
-  atlas stream "Design a weather dashboard"
-  stream "Create a simple card game in python"
-  ```
+**Streaming mode is now enabled by default!** Just type your prompt:
 
-### 3. Watch Real-Time Generation
+```bash
+Create a React todo app
+Build a ping pong game
+Design a weather dashboard
+atlas generate "Create a card game in python"
+```
+
+All prompts now use real-time streaming automatically - no need for special commands!
+
+### 5. Watch Real-Time Generation
 - **Code appears line-by-line** in the editor as it's generated
 - **Multiple files get separate tabs** (e.g., `index.html`, `styles.css`, `script.js`)
 - **Click any tab** to review content during or after streaming

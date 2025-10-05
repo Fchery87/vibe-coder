@@ -88,7 +88,7 @@ export default function Home() {
     currentTask?: string;
     progress?: number;
   }>({ isActive: false });
-  const [isStreamingMode, setIsStreamingMode] = useState(false);
+  const [isStreamingMode, setIsStreamingMode] = useState(true);
   const [streamingFiles, setStreamingFiles] = useState<Array<{ path: string; status: string; content: string }>>([]);
 
   const handleGenerate = async (prompt: string) => {
