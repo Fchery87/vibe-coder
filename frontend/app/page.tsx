@@ -7,6 +7,7 @@ import FileTree from "@/components/FileTree";
 import PreviewPanel from "@/components/PreviewPanel";
 import CommandPalette from "@/components/CommandPalette";
 import AtlasCLI from "@/components/AtlasCLI";
+import StreamingEditor from "@/components/StreamingEditor";
 import { ToastContainer, useToast } from "@/components/Toast";
 import InlineDiff from "@/components/InlineDiff";
 import ModelFeedbackLoop from "@/components/ModelFeedbackLoop";
@@ -87,6 +88,8 @@ export default function Home() {
     currentTask?: string;
     progress?: number;
   }>({ isActive: false });
+  const [isStreamingMode, setIsStreamingMode] = useState(false);
+  const [streamingFiles, setStreamingFiles] = useState<Array<{ path: string; status: string; content: string }>>([]);
 
   const handleGenerate = async (prompt: string) => {
     const startTime = new Date();
@@ -508,6 +511,12 @@ export default function Home() {
   };
 
   const handleChatSubmit = async (prompt: string) => {
+    // If in streaming mode, start streaming instead of regular generation
+    if (isStreamingMode) {
+      handleStartStreaming(prompt);
+      return;
+    }
+
     // Add user message to chat
     const userMessage: ChatMessage = {
       role: 'user',
@@ -612,6 +621,38 @@ export default function Home() {
     if (activity.isActive) {
       addToast(`CLI: ${activity.currentTask}`, 'info');
     }
+  };
+
+  const handleStreamingComplete = (files: Array<{ path: string; status: string; content: string }>) => {
+    console.log('Streaming completed with files:', files.length, files.map(f => f.path));
+
+    // Keep streaming files for display
+    setStreamingFiles(files);
+
+    // Don't exit streaming mode - keep the files visible
+    // setIsStreamingMode(false);
+
+    // Notify about completed streaming
+    addToast(`Streaming complete: ${files.length} files generated`, 'success');
+
+    // Ensure we're in editor view to show the generated files
+    setActiveView('editor');
+
+    // Track file modifications for CLI integration
+    files.forEach(file => {
+      handleCliFileModified(file.path, 'streaming generation');
+    });
+  };
+
+  const handleStreamingError = (error: string) => {
+    setIsStreamingMode(false);
+    addToast(`Streaming error: ${error}`, 'error');
+  };
+
+  const handleStartStreaming = (prompt: string) => {
+    setIsStreamingMode(true);
+    setStreamingFiles([]);
+    setActiveView('editor');
   };
 
   // Atlas CLI Event Listeners
@@ -1075,6 +1116,26 @@ export default function Home() {
                     <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
                   </TabsList>
 
+                  {/* Streaming Mode Toggle */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setIsStreamingMode(!isStreamingMode)}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          isStreamingMode
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
+                        }`}
+                        title="Toggle streaming code generation mode"
+                      >
+                        {isStreamingMode ? '🔄 Streaming Mode' : '⚡ Streaming Mode'}
+                      </button>
+                      {isStreamingMode && (
+                        <span className="text-xs text-blue-400">Real-time code generation</span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
                       {activeView === 'editor' ? (
@@ -1119,11 +1180,20 @@ export default function Home() {
 
                 {/* Editor Tab Content */}
                 <TabsContent value="editor" className="flex-1 min-h-0 m-0">
-                  <CodeEditor
-                    value={isGenerating && !generatedCode ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!" : generatedCode}
-                    onChange={(val) => val !== undefined && setGeneratedCode(val)}
-                    originalValue={originalGeneratedCode}
-                  />
+                  {isStreamingMode ? (
+                    <StreamingEditor
+                      onStreamingComplete={handleStreamingComplete}
+                      onStreamingError={handleStreamingError}
+                      onFileModified={handleCliFileModified}
+                      onExitStreaming={() => setIsStreamingMode(false)}
+                    />
+                  ) : (
+                    <CodeEditor
+                      value={isGenerating && !generatedCode ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!" : generatedCode}
+                      onChange={(val) => val !== undefined && setGeneratedCode(val)}
+                      originalValue={originalGeneratedCode}
+                    />
+                  )}
                 </TabsContent>
 
                 {/* Sandbox Tab Content */}

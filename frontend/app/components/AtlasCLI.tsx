@@ -257,6 +257,23 @@ Ready to build something amazing? Just describe it! ✨`,
       case 'execute':
         await executeShellCommand(args);
         break;
+      case 'stream':
+        // Handle standalone stream command (not atlas stream)
+        const prompt = args.join(' ');
+        if (!prompt) {
+          addCommand('stream', '❌ Error: Please provide a prompt. Example: stream "Create a React app"', 'error');
+          return;
+        }
+
+        // Check if streaming mode is active and start streaming directly
+        if ((window as any).startStreamingSession) {
+          console.log('Starting streaming session from standalone stream command with prompt:', prompt);
+          (window as any).startStreamingSession(prompt);
+          addCommand(`stream "${prompt}"`, '🚀 Starting real-time streaming code generation...', 'info');
+        } else {
+          addCommand('stream', '❌ Error: Streaming mode not active. Please enable streaming mode in the editor first.', 'error');
+        }
+        break;
       default:
         // If command doesn't match any specific atlas subcommand, treat as direct prompt
         if (cmd.length > 2 && !cmd.startsWith('/')) {
@@ -363,6 +380,23 @@ Ready to build something amazing? Just describe it! ✨`,
         showProjectStatus();
         break;
 
+      case 'stream':
+        const streamPrompt = subArgs.join(' ');
+        if (!streamPrompt) {
+          addCommand('atlas stream', '❌ Error: Please provide a prompt for streaming. Example: atlas stream "Create a React app"', 'error');
+          return;
+        }
+
+        // Check if streaming mode is active and start streaming directly
+        if ((window as any).startStreamingSession) {
+          console.log('Starting streaming session from Atlas CLI with prompt:', streamPrompt);
+          (window as any).startStreamingSession(streamPrompt);
+          addCommand(`atlas stream "${streamPrompt}"`, '🚀 Starting real-time streaming code generation...', 'info');
+        } else {
+          addCommand('atlas stream', '❌ Error: Streaming mode not active. Please enable streaming mode in the editor first.', 'error');
+        }
+        break;
+
       case 'clear':
         setCommands([]);
         break;
@@ -399,6 +433,10 @@ Ready to build something amazing? Just describe it! ✨`,
   git [command]          Execute git commands
   shell <command>        Execute any shell command
 
+⚡ Streaming Generation:
+  atlas stream <prompt>  Generate code with real-time streaming
+  stream <prompt>        Same as above (shorter version)
+
 🔧 Advanced Commands:
   Type /commands to see all available commands
 
@@ -434,6 +472,10 @@ Ready to build something amazing? Just describe it! ✨`;
   install <packages>          Install npm packages
   git [command]               Execute git commands (status, add, commit, etc.)
   shell <command>             Execute any shell command
+
+⚡ Streaming Generation:
+  atlas stream <prompt>       Generate code with real-time streaming
+  stream <prompt>             Same as above (shorter version)
 
 🛠️ Utility Commands:
   atlas clear                 Clear terminal history
@@ -718,8 +760,8 @@ Try: npm install, git status, ls, or any shell command`;
         e.preventDefault();
         // Auto-complete common commands
         const commonCommands = [
-          'atlas generate', 'atlas help', 'atlas status', 'atlas export',
-          'env', 'ls', 'cat', 'run', 'install', 'git status', 'shell'
+          'atlas generate', 'atlas help', 'atlas status', 'atlas export', 'atlas stream',
+          'env', 'ls', 'cat', 'run', 'install', 'git status', 'shell', 'stream'
         ];
         const matchingCommand = commonCommands.find(cmd => cmd.startsWith(currentCommand));
         if (matchingCommand) {
