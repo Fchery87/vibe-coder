@@ -1126,8 +1126,8 @@ export default function Home() {
 
             {/* Editor/Sandbox Column */}
             <div className="flex flex-col min-h-0 xl:border-l border-slate-700/50">
-              {/* Hidden StreamingEditor to keep functions exposed globally */}
-              <div style={{ display: 'none' }}>
+              {/* Hidden StreamingEditor to keep functions exposed globally - positioned absolutely so it doesn't affect layout */}
+              <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
                 <StreamingEditor
                   onStreamingComplete={handleStreamingComplete}
                   onStreamingError={handleStreamingError}
@@ -1208,16 +1208,14 @@ export default function Home() {
 
                 {/* Editor Tab Content */}
                 <TabsContent value="editor" className="flex-1 min-h-0 m-0">
-                  {/* Always render StreamingEditor to keep function exposed, but hide when not in use */}
-                  <div style={{ display: isStreamingMode ? 'flex' : 'none', flex: 1, minHeight: 0 }}>
+                  {isStreamingMode ? (
                     <StreamingEditor
                       onStreamingComplete={handleStreamingComplete}
                       onStreamingError={handleStreamingError}
                       onFileModified={handleCliFileModified}
                       onExitStreaming={() => setIsStreamingMode(false)}
                     />
-                  </div>
-                  {!isStreamingMode && (
+                  ) : (
                     <CodeEditor
                       value={isGenerating && !generatedCode ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!" : generatedCode}
                       onChange={(val) => val !== undefined && setGeneratedCode(val)}
