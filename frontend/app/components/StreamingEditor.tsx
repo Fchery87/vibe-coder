@@ -196,9 +196,9 @@ export default function StreamingEditor({
   };
 
   // Start streaming session (called from parent component)
-  const startStreamingSession = async (prompt: string) => {
-    console.log('Starting streaming session with prompt:', prompt);
-    await startStreaming(prompt);
+  const startStreamingSession = async (prompt: string, options?: { provider?: string; model?: string }) => {
+    console.log('Starting streaming session with prompt:', prompt, 'options:', options);
+    await startStreaming(prompt, options);
   };
 
   // Expose startStreamingSession to parent component
@@ -214,7 +214,7 @@ export default function StreamingEditor({
   }, [isStreaming]);
 
   // Start streaming session
-  const startStreaming = async (prompt: string) => {
+  const startStreaming = async (prompt: string, options?: { provider?: string; model?: string }) => {
     if (isStreaming) {
       console.log('Already streaming, ignoring request');
       return;
@@ -228,6 +228,12 @@ export default function StreamingEditor({
     // Create abort controller for cancellation
     abortControllerRef.current = new AbortController();
 
+    // Get provider and model from localStorage if not provided
+    const provider = options?.provider || localStorage.getItem('activeProvider') || 'openai';
+    const model = options?.model || localStorage.getItem('selectedModel') || 'gpt-4o';
+
+    console.log('Using provider:', provider, 'model:', model);
+
     try {
       console.log('Fetching from /api/generate...');
       const response = await fetch('/api/generate', {
@@ -235,13 +241,32 @@ export default function StreamingEditor({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          prompt,
+          provider,
+          model,
+          routingMode: 'single-model'
+        }),
         signal: abortControllerRef.current.signal
       });
 
       console.log('Response status:', response.status);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Backend error response:', errorText);
+
+        // Try to parse as JSON for better error messages
+        let errorMessage = errorText;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.details || errorJson.error || errorText;
+        } catch {
+          // Not JSON, use as-is
+        }
+
+        onStreamingError?.(errorMessage);
+        setIsStreaming(false);
+        return;
       }
 
       const reader = response.body?.getReader();

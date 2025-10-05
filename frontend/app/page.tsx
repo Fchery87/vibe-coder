@@ -802,11 +802,14 @@ export default function Home() {
                   onChange={(e) => {
                     const p = e.target.value;
                     setActiveProvider(p);
-                    if (p === 'xai') setSelectedModel('grok-4-fast-reasoning');
-                    else if (p === 'openai') setSelectedModel('gpt-4o');
-                    else if (p === 'anthropic') setSelectedModel('claude-3-5-sonnet-20241022');
-                    else if (p === 'google') setSelectedModel('gemini-2.5-pro');
-                    else setSelectedModel('');
+                    localStorage.setItem('activeProvider', p);
+                    let defaultModel = '';
+                    if (p === 'xai') defaultModel = 'grok-4-fast-reasoning';
+                    else if (p === 'openai') defaultModel = 'gpt-4o';
+                    else if (p === 'anthropic') defaultModel = 'claude-3-5-sonnet-20241022';
+                    else if (p === 'google') defaultModel = 'gemini-2.5-pro';
+                    setSelectedModel(defaultModel);
+                    if (defaultModel) localStorage.setItem('selectedModel', defaultModel);
                   }}
                   className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
                 >
@@ -820,7 +823,11 @@ export default function Home() {
                 <span className="text-xs text-gray-400">Model:</span>
                 <select
                   value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
+                  onChange={(e) => {
+                    const model = e.target.value;
+                    setSelectedModel(model);
+                    localStorage.setItem('selectedModel', model);
+                  }}
                   className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
                 >
                   {activeProvider === 'xai' && (

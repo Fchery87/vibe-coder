@@ -1,11 +1,45 @@
-# Streaming Code Generation - Local Testing Guide
+# Streaming Code Generation - Setup Guide
 
-## How to Test Streaming Locally
+## Quick Start
 
-### 1. Enable Streaming Mode
+### 1. Start the Backend Server
+
+**IMPORTANT**: The backend server must be running for streaming to work!
+
+```bash
+cd backend
+npm install  # First time only
+npm start    # Starts backend on http://localhost:3001
+```
+
+### 2. Start the Frontend
+
+In a new terminal:
+
+```bash
+cd frontend
+npm install  # First time only
+npm run dev  # Starts frontend on http://localhost:3000
+```
+
+### 3. Configure Your AI Provider
+
+Make sure you have API keys configured in `backend/.env.local` (or root `.env.local`):
+
+```bash
+# Choose at least one provider with valid credits
+OPENAI_API_KEY=your-openai-key-here          # Needs billing configured
+ANTHROPIC_API_KEY=your-anthropic-key-here    # Needs valid API key
+GOOGLE_API_KEY=your-google-key-here          # ✅ Working!
+XAI_API_KEY=your-xai-key-here                # Needs credits
+```
+
+**Recommended for testing**: Use Google API (Gemini) as it has free tier and is currently working!
+
+### 4. Enable Streaming Mode
 - In the Vibe Coder interface, click the **"⚡ Streaming Mode"** toggle in the editor header (next to Editor/Sandbox tabs)
 
-### 2. Start Streaming
+### 5. Start Streaming
 - In Atlas CLI, use one of these commands:
   ```bash
   atlas stream "Create a React todo app"
@@ -48,32 +82,59 @@ The streaming generator produces **properly formatted code** with:
 - ✅ Blank lines between top-level functions
 - ✅ Proper line length management
 
-## Mock Generators Available
+## How It Works
 
-### React Applications
-```
-atlas stream "Create a React todo app"
-```
-Generates: `TodoApp.jsx`, `App.jsx`, `index.jsx`
+When you use streaming mode:
 
-### Games
-```
-stream "Build a ping pong game"
-```
-Generates: `index.html`, `styles.css`, `script.js`
+1. **Frontend** sends your prompt + provider/model to `/api/generate`
+2. **API Route** calls your backend at `http://localhost:3001/api/llm/generate`
+3. **Backend** calls the real AI API (OpenAI, Anthropic, etc.)
+4. **AI generates code** based on your prompt
+5. **Prettier formats** the code properly
+6. **Code is parsed** into multiple files (if applicable)
+7. **Files are streamed** line-by-line to the editor
 
-### Python Applications
+### Example Prompts
+
+```bash
+atlas stream "Create a React todo app with add/delete/toggle"
+stream "Build a ping pong game with HTML canvas"
+atlas stream "Create a Python web scraper"
+stream "Design a login form with validation"
+atlas stream "Build a Twitter-like feed component"
 ```
-atlas stream "Create a simple card game in python"
-```
-Generates: `card_game.py`
 
 ## Troubleshooting
 
+### Error: "Backend server not running"
+
+This means the backend isn't running. Fix:
+
+```bash
+cd backend
+npm start
+```
+
+Verify it's running by visiting: http://localhost:3001/api/llm/providers
+
+### Error: "Provider not configured"
+
+You need to add API keys to `backend/.env.local`:
+
+1. Copy the example file:
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
+2. Edit `.env.local` and add your API keys
+
+3. Restart the backend server
+
 ### If Nothing Happens
-1. **Check streaming mode** - Ensure "⚡ Streaming Mode" is enabled in editor
-2. **Check console** - Look for error messages in browser console
-3. **Verify endpoint** - Ensure `/api/generate` endpoint is accessible
+1. **Check backend** - Ensure backend server is running on port 3001
+2. **Check streaming mode** - Ensure "⚡ Streaming Mode" is enabled in editor
+3. **Check console** - Look for error messages in browser console
+4. **Check provider** - Select a provider (OpenAI, Anthropic, etc.) in the UI
 
 ### If Files Don't Persist
 - Files should remain visible after streaming completion

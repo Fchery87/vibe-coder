@@ -32,6 +32,10 @@ interface StreamMessage {
   message?: string;
 }
 
+// Backend API URL - adjust if your backend runs on a different port
+// Use 127.0.0.1 instead of localhost to avoid DNS/network issues in Next.js
+const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:3001';
+
 class MockStreamingGenerator {
   private files: Array<{ path: string; content: string }> = [];
   private prepared = false;
@@ -271,41 +275,121 @@ document.head.appendChild(style);`
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt } = body;
+    const { prompt, model, provider, routingMode } = body;
 
     if (!prompt) {
       return new Response('Prompt is required', { status: 400 });
     }
 
-    const generator = new MockStreamingGenerator(prompt);
-    await generator.prepare();
+    console.log('[Stream API] Generating code with backend API', { prompt: prompt.substring(0, 50), model, provider });
 
+    // Call backend API to generate code
+    let backendResponse: Response;
+    try {
+      backendResponse = await fetch(`${BACKEND_URL}/llm/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          model,
+          activeProvider: provider,
+          routingMode: routingMode || 'single-model'
+        }),
+        // Increase timeout to 60 seconds for AI generation
+        signal: AbortSignal.timeout(60000)
+      });
+    } catch (fetchError: any) {
+      console.error('[Stream API] Failed to connect to backend:', fetchError.message);
+      return new Response(
+        JSON.stringify({
+          error: 'Backend server not running',
+          details: `Cannot connect to backend at ${BACKEND_URL}. Please start the backend server with: cd backend && npm start`,
+          hint: 'Make sure your backend server is running on port 3001'
+        }),
+        {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    if (!backendResponse.ok) {
+      let errorData: any;
+      try {
+        errorData = await backendResponse.json();
+      } catch {
+        errorData = { error: 'Backend returned an error', status: backendResponse.status };
+      }
+      return new Response(
+        JSON.stringify({ error: errorData.error || 'Backend API error', details: errorData }),
+        {
+          status: backendResponse.status,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const result = await backendResponse.json();
+    const generatedCode = result.code;
+
+    if (!generatedCode) {
+      return new Response(JSON.stringify({ error: 'No code generated' }), { status: 500 });
+    }
+
+    console.log('[Stream API] Code generated successfully, length:', generatedCode.length);
+
+    // Parse the generated code to create file structure
+    const files = await parseGeneratedCodeIntoFiles(generatedCode, prompt);
+
+    // Format all files with Prettier
+    const formattedFiles = await Promise.all(
+      files.map(async (file) => ({
+        ...file,
+        content: await formatContent(file.content, file.path)
+      }))
+    );
+
+    console.log('[Stream API] Created', formattedFiles.length, 'files for streaming');
+
+    // Stream the files to the client
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          for await (const message of generator.generateStream()) {
-            let data = '';
-            switch (message.type) {
-              case 'FILE_OPEN':
-                data = JSON.stringify({ type: 'FILE_OPEN', path: message.path });
-                break;
-              case 'APPEND':
-                data = JSON.stringify({ type: 'APPEND', text: message.text });
-                break;
-              case 'FILE_CLOSE':
-                data = JSON.stringify({ type: 'FILE_CLOSE', path: message.path });
-                break;
-              case 'COMPLETE':
-                data = JSON.stringify({ type: 'COMPLETE' });
-                break;
-              case 'ERROR':
-                data = JSON.stringify({ type: 'ERROR', message: message.message });
-                break;
+          for (const file of formattedFiles) {
+            // Send FILE_OPEN event
+            controller.enqueue('data: ' + JSON.stringify({ type: 'FILE_OPEN', path: file.path }) + '\n\n');
+
+            // Split content into lines and stream them
+            const lines = file.content.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+              const isLastLine = i === lines.length - 1;
+              const line = lines[i];
+
+              // Skip empty last lines
+              if (isLastLine && line === '') continue;
+
+              const chunk = isLastLine ? line : line + '\n';
+
+              // Send APPEND event
+              controller.enqueue('data: ' + JSON.stringify({ type: 'APPEND', text: chunk }) + '\n\n');
+
+              // Add realistic delay for streaming effect
+              await new Promise(resolve => setTimeout(resolve, Math.random() * 50 + 25));
             }
 
-            controller.enqueue('data: ' + data + '\n\n');
+            // Send FILE_CLOSE event
+            controller.enqueue('data: ' + JSON.stringify({ type: 'FILE_CLOSE', path: file.path }) + '\n\n');
+
+            // Delay between files
+            await new Promise(resolve => setTimeout(resolve, 300));
           }
+
+          // Send COMPLETE event
+          controller.enqueue('data: ' + JSON.stringify({ type: 'COMPLETE' }) + '\n\n');
         } catch (error: any) {
+          console.error('[Stream API] Error during streaming:', error);
           controller.enqueue('data: ' + JSON.stringify({ type: 'ERROR', message: error?.message || 'Unknown error' }) + '\n\n');
         } finally {
           controller.close();
@@ -321,6 +405,188 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error: any) {
+    console.error('[Stream API] Error:', error);
     return new Response('Error: ' + (error?.message || 'Unknown error'), { status: 500 });
   }
+}
+
+// Helper function to format content with Prettier
+async function formatContent(content: string, filePath: string): Promise<string> {
+  const normalized = content.replace(/\r\n/g, '\n');
+  const parser = getParserForPath(filePath);
+
+  if (!parser) {
+    return content.endsWith('\n') ? content : content + '\n';
+  }
+
+  try {
+    const formatted = await prettier.format(normalized, {
+      parser,
+      plugins: PRETTIER_PLUGINS,
+      semi: PRETTIER_OPTIONS.semi,
+      singleQuote: parser === 'html' ? false : PRETTIER_OPTIONS.singleQuote,
+      trailingComma: PRETTIER_OPTIONS.trailingComma,
+      tabWidth: parser === 'markdown' || parser === 'yaml' ? 2 : 2,
+      printWidth: PRETTIER_OPTIONS.printWidth
+    });
+
+    return formatted.endsWith('\n') ? formatted : formatted + '\n';
+  } catch (error) {
+    console.warn('Failed to format ' + filePath + ':', error);
+    return content.endsWith('\n') ? content : content + '\n';
+  }
+}
+
+function getParserForPath(filePath: string): prettier.BuiltInParserName | undefined {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+
+  switch (ext) {
+    case 'ts':
+    case 'tsx':
+      return 'typescript';
+    case 'js':
+    case 'jsx':
+      return 'babel';
+    case 'json':
+      return 'json';
+    case 'html':
+    case 'htm':
+      return 'html';
+    case 'css':
+    case 'scss':
+    case 'less':
+      return 'css';
+    case 'md':
+    case 'markdown':
+      return 'markdown';
+    case 'yml':
+    case 'yaml':
+      return 'yaml';
+    default:
+      return undefined;
+  }
+}
+
+// Helper function to parse generated code into files
+async function parseGeneratedCodeIntoFiles(
+  code: string,
+  prompt: string
+): Promise<Array<{ path: string; content: string }>> {
+  // Try to detect file markers in the generated code
+  const fileMarkerRegex = /^(?:\/\/|#|<!--|\/\*)\s*(?:File|Filename|Path):\s*(.+?)(?:\s*(?:-->|\*\/))?\s*$/gim;
+  const matches = Array.from(code.matchAll(fileMarkerRegex));
+
+  if (matches.length > 0) {
+    // Code has file markers - split by them
+    const files: Array<{ path: string; content: string }> = [];
+
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const filePath = match[1].trim();
+      const startIndex = match.index! + match[0].length;
+      const endIndex = i < matches.length - 1 ? matches[i + 1].index! : code.length;
+      const fileContent = code.substring(startIndex, endIndex).trim();
+
+      files.push({ path: filePath, content: fileContent });
+    }
+
+    return files;
+  }
+
+  // No file markers - infer structure from prompt and code
+  const promptLower = prompt.toLowerCase();
+
+  // Detect language/framework from code content
+  if (code.includes('import React') || code.includes('from \'react\'') || code.includes('jsx')) {
+    return inferReactStructure(code, promptLower);
+  } else if (code.includes('<!DOCTYPE html>') || code.includes('<html')) {
+    return inferHTMLStructure(code);
+  } else if (code.includes('def ') || code.includes('import ') && code.includes(':')) {
+    return inferPythonStructure(code, promptLower);
+  }
+
+  // Default: single file
+  const ext = detectFileExtension(code);
+  return [{ path: `generated.${ext}`, content: code }];
+}
+
+function inferReactStructure(code: string, promptLower: string): Array<{ path: string; content: string }> {
+  const files: Array<{ path: string; content: string }> = [];
+
+  // Try to split by component definitions
+  const componentRegex = /(?:^|\n)(?:export\s+)?(?:default\s+)?(?:function|class|const)\s+(\w+)/g;
+  const components = Array.from(code.matchAll(componentRegex));
+
+  if (components.length > 1) {
+    // Multiple components - create separate files
+    components.forEach((match, i) => {
+      const componentName = match[1];
+      const startIndex = match.index!;
+      const endIndex = i < components.length - 1 ? components[i + 1].index! : code.length;
+      const content = code.substring(startIndex, endIndex).trim();
+
+      files.push({
+        path: `src/components/${componentName}.jsx`,
+        content
+      });
+    });
+  } else {
+    // Single component
+    files.push({
+      path: 'src/App.jsx',
+      content: code
+    });
+  }
+
+  return files;
+}
+
+function inferHTMLStructure(code: string): Array<{ path: string; content: string }> {
+  const files: Array<{ path: string; content: string }> = [];
+
+  // Extract CSS if embedded
+  const styleMatch = code.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  if (styleMatch) {
+    files.push({
+      path: 'styles.css',
+      content: styleMatch[1].trim()
+    });
+  }
+
+  // Extract JavaScript if embedded
+  const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+  if (scriptMatch) {
+    files.push({
+      path: 'script.js',
+      content: scriptMatch[1].trim()
+    });
+  }
+
+  // Main HTML file
+  files.push({
+    path: 'index.html',
+    content: code
+  });
+
+  return files;
+}
+
+function inferPythonStructure(code: string, promptLower: string): Array<{ path: string; content: string }> {
+  // Detect if it's a single script or module
+  const hasClasses = code.includes('class ');
+  const fileName = promptLower.includes('game') ? 'game.py' : hasClasses ? 'main.py' : 'script.py';
+
+  return [{
+    path: fileName,
+    content: code
+  }];
+}
+
+function detectFileExtension(code: string): string {
+  if (code.includes('import React') || code.includes('jsx')) return 'jsx';
+  if (code.includes('import ') && code.includes('from ')) return 'js';
+  if (code.includes('def ') || code.includes('import ')) return 'py';
+  if (code.includes('<!DOCTYPE') || code.includes('<html')) return 'html';
+  if (code.includes('function') || code.includes('const')) return 'js';
+  return 'txt';
 }
