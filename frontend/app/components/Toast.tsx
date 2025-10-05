@@ -129,7 +129,8 @@ export function useToast() {
   }>>([]);
 
   const addToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    const id = Date.now().toString();
+    // Generate unique ID using timestamp + random number to avoid collisions
+    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setToasts(prev => [...prev, { id, message, type }]);
   };
 

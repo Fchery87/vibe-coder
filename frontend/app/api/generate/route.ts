@@ -1,4 +1,29 @@
 import { NextRequest } from 'next/server';
+import prettier from 'prettier';
+import babelPlugin from 'prettier/plugins/babel';
+import estreePlugin from 'prettier/plugins/estree';
+import htmlPlugin from 'prettier/plugins/html';
+import markdownPlugin from 'prettier/plugins/markdown';
+import postcssPlugin from 'prettier/plugins/postcss';
+import typescriptPlugin from 'prettier/plugins/typescript';
+import yamlPlugin from 'prettier/plugins/yaml';
+
+const PRETTIER_PLUGINS: prettier.Plugin[] = [
+  babelPlugin,
+  estreePlugin,
+  htmlPlugin,
+  markdownPlugin,
+  postcssPlugin,
+  typescriptPlugin,
+  yamlPlugin
+];
+
+const PRETTIER_OPTIONS = {
+  semi: true,
+  singleQuote: true,
+  trailingComma: 'es5' as const,
+  printWidth: 100
+};
 
 interface StreamMessage {
   type: 'FILE_OPEN' | 'APPEND' | 'FILE_CLOSE' | 'COMPLETE' | 'ERROR';
@@ -9,334 +34,238 @@ interface StreamMessage {
 
 class MockStreamingGenerator {
   private files: Array<{ path: string; content: string }> = [];
-  private currentFileIndex = 0;
+  private prepared = false;
 
-  constructor(private prompt: string) {
-    this.generateMockFiles();
+  constructor(private readonly prompt: string) {}
+
+  private async formatContent(content: string, filePath: string): Promise<string> {
+    const normalized = this.normalizeLineEndings(content);
+    const parser = this.getParserForPath(filePath);
+
+    if (!parser) {
+      return this.ensureTrailingNewline(normalized);
+    }
+
+    try {
+      const formatted = await prettier.format(normalized, {
+        parser,
+        plugins: PRETTIER_PLUGINS,
+        semi: PRETTIER_OPTIONS.semi,
+        singleQuote: parser === 'html' ? false : PRETTIER_OPTIONS.singleQuote,
+        trailingComma: PRETTIER_OPTIONS.trailingComma,
+        tabWidth: this.getTabWidth(parser),
+        printWidth: PRETTIER_OPTIONS.printWidth
+      });
+
+      return this.ensureTrailingNewline(formatted);
+    } catch (error) {
+      console.warn('Failed to format ' + filePath + ':', error);
+      return this.ensureTrailingNewline(normalized);
+    }
   }
 
-  private generateMockFiles() {
-    // Generate different file types based on prompt
-    if (this.prompt.toLowerCase().includes('react')) {
-      this.files = [
+  private getParserForPath(filePath: string): prettier.BuiltInParserName | undefined {
+    const ext = filePath.split('.').pop()?.toLowerCase();
+
+    switch (ext) {
+      case 'ts':
+      case 'tsx':
+        return 'typescript';
+      case 'js':
+      case 'jsx':
+        return 'babel';
+      case 'json':
+        return 'json';
+      case 'html':
+      case 'htm':
+        return 'html';
+      case 'css':
+      case 'scss':
+      case 'less':
+        return 'css';
+      case 'md':
+      case 'markdown':
+        return 'markdown';
+      case 'yml':
+      case 'yaml':
+        return 'yaml';
+      default:
+        return undefined;
+    }
+  }
+
+  private getTabWidth(parser: prettier.BuiltInParserName): number {
+    if (parser === 'markdown' || parser === 'yaml') {
+      return 2;
+    }
+
+    return 2;
+  }
+
+  private ensureTrailingNewline(content: string): string {
+    return content.endsWith('\n') ? content : content + '\n';
+  }
+
+  private normalizeLineEndings(content: string): string {
+    return content.replace(/\r\n/g, '\n');
+  }
+
+  private getFormattedLines(content: string): string[] {
+    return this.ensureTrailingNewline(this.normalizeLineEndings(content)).split('\n');
+  }
+
+  async prepare() {
+    const rawFiles = this.getMockFiles();
+    this.files = await Promise.all(
+      rawFiles.map(async (file) => ({
+        path: file.path,
+        content: await this.formatContent(file.content, file.path)
+      }))
+    );
+    this.prepared = true;
+  }
+
+  private getMockFiles(): Array<{ path: string; content: string }> {
+    const promptLower = this.prompt.toLowerCase();
+
+    if (promptLower.includes('react')) {
+      return [
         {
           path: 'src/components/TodoApp.jsx',
-          content: `import React, { useState } from 'react';
-
-function TodoApp() {
-  const [todos, setTodos] = useState([]);
-  const [inputValue, setInputValue] = useState('');
-
-  const addTodo = () => {
-    if (inputValue.trim()) {
-      setTodos([...todos, {
-        id: Date.now(),
-        text: inputValue,
-        completed: false
-      }]);
-      setInputValue('');
-    }
-  };
-
-  return (
-    <div className="todo-container">
-      <h1>Todo Application</h1>
-      <div className="input-section">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Enter a todo item..."
-        />
-        <button onClick={addTodo}>Add Todo</button>
-      </div>
-      <ul className="todo-list">
-        {todos.map(todo => (
-          <li key={todo.id}>
-            <span>{todo.text}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export default TodoApp;`
+          content: 'import React, { useState } from \'react\';\n\nfunction TodoApp() {\n  const [todos, setTodos] = useState([]);\n  const [inputValue, setInputValue] = useState(\'\');\n\n  const addTodo = () => {\n    if (inputValue.trim()) {\n      setTodos([\n        ...todos,\n        {\n          id: Date.now(),\n          text: inputValue,\n          completed: false\n        }\n      ]);\n      setInputValue(\'\');\n    }\n  };\n\n  const toggleTodo = (id) => {\n    setTodos(\n      todos.map((todo) =>\n        todo.id === id\n          ? {\n              ...todo,\n              completed: !todo.completed\n            }\n          : todo\n      )\n    );\n  };\n\n  const deleteTodo = (id) => {\n    setTodos(todos.filter((todo) => todo.id !== id));\n  };\n\n  return (\n    <div className="todo-container">\n      <h1>Todo Application</h1>\n\n      <div className="input-section">\n        <input\n          type="text"\n          value={inputValue}\n          onChange={(e) => setInputValue(e.target.value)}\n          placeholder="Enter a todo item..."\n        />\n        <button onClick={addTodo}>Add Todo</button>\n      </div>\n\n      <ul className="todo-list">\n        {todos.map((todo) => (\n          <li key={todo.id}>\n            <input\n              type="checkbox"\n              checked={todo.completed}\n              onChange={() => toggleTodo(todo.id)}\n            />\n            <span className={todo.completed ? \'completed\' : \'\'}>\n              {todo.text}\n            </span>\n            <button onClick={() => deleteTodo(todo.id)}>Delete</button>\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}\n\nexport default TodoApp;'
         },
         {
           path: 'src/App.jsx',
-          content: `import React from 'react';
-import TodoApp from './components/TodoApp';
-
-function App() {
-  return (
-    <div className="App">
-      <TodoApp />
-    </div>
-  );
-}
-
-export default App;`
+          content: 'import React from \'react\';\nimport TodoApp from \'./components/TodoApp\';\n\nfunction App() {\n  return (\n    <div className="App">\n      <TodoApp />\n    </div>\n  );\n}\n\nexport default App;'
+        },
+        {
+          path: 'src/index.jsx',
+          content: 'import React from \'react\';\nimport ReactDOM from \'react-dom\';\nimport App from \'./App\';\n\nReactDOM.render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n  document.getElementById(\'root\')\n);'
         }
       ];
-    } else if (this.prompt.toLowerCase().includes('ping pong') || this.prompt.toLowerCase().includes('pong')) {
-      this.files = [
-        {
-          path: 'index.html',
-          content: `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Ping Pong Game</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Ping Pong Game</h1>
-        <canvas id="gameCanvas" width="800" height="400"></canvas>
-        <div class="controls">
-            <button id="startBtn">Start Game</button>
-            <div class="score">Score: <span id="score">0</span></div>
-        </div>
-    </div>
-    <script src="script.js"></script>
-</body>
-</html>`
-        },
-        {
-          path: 'styles.css',
-          content: `/* Game Styles */
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    text-align: center;
-    font-family: Arial, sans-serif;
-}
-
-#gameCanvas {
-    border: 2px solid #333;
-    background: #000;
-    margin: 20px 0;
-}
-
-.controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 20px;
-}
-
-button {
-    padding: 10px 20px;
-    background: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.score {
-    font-size: 18px;
-    font-weight: bold;
-}`
-        },
-        {
-          path: 'script.js',
-          content: `// Simple Ping Pong Game
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const startBtn = document.getElementById('startBtn');
-const scoreElement = document.getElementById('score');
-
-// Game state
-let gameRunning = false;
-let score = 0;
-
-// Simple game loop
-function gameLoop() {
-    if (!gameRunning) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw game elements
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(10, canvas.height / 2 - 50, 10, 100); // Left paddle
-    ctx.fillRect(canvas.width - 20, canvas.height / 2 - 50, 10, 100); // Right paddle
-    ctx.beginPath();
-    ctx.arc(canvas.width / 2, canvas.height / 2, 10, 0, Math.PI * 2);
-    ctx.fill(); // Ball
-
-    requestAnimationFrame(gameLoop);
-}
-
-startBtn.addEventListener('click', () => {
-    gameRunning = !gameRunning;
-    startBtn.textContent = gameRunning ? 'Stop Game' : 'Start Game';
-
-    if (gameRunning) {
-        gameLoop();
     }
-});`
+
+    if (promptLower.includes('python') || promptLower.includes('card game')) {
+      return [
+        {
+          path: 'card_game.py',
+          content: '# Simple Card Game in Python\nimport random\nimport time\n\nclass Card:\n    def __init__(self, suit, rank):\n        self.suit = suit\n        self.rank = rank\n\n    def __str__(self):\n        return f"{self.rank} of {self.suit}"\n\nclass Deck:\n    def __init__(self):\n        suits = [\'Hearts\', \'Diamonds\', \'Clubs\', \'Spades\']\n        ranks = [\'2\', \'3\', \'4\', \'5\', \'6\', \'7\', \'8\', \'9\', \'10\',\n                \'Jack\', \'Queen\', \'King\', \'Ace\']\n        self.cards = [Card(suit, rank) for suit in suits for rank in ranks]\n        self.shuffle()\n\n    def shuffle(self):\n        random.shuffle(self.cards)\n\n    def deal(self):\n        return self.cards.pop() if self.cards else None\n\ndef play_card_game():\n    print("Welcome to the Card Game!")\n    print("Drawing cards...")\n\n    deck = Deck()\n    player_card = deck.deal()\n    computer_card = deck.deal()\n\n    print(f"Your card: {player_card}")\n    print(f"Computer\'s card: {computer_card}")\n\n    # Simple comparison (higher rank wins)\n    player_rank = get_card_value(player_card.rank)\n    computer_rank = get_card_value(computer_card.rank)\n\n    if player_rank > computer_rank:\n        print("You win! 🎉")\n    elif computer_rank > player_rank:\n        print("Computer wins! 🤖")\n    else:\n        print("It\'s a tie! 🤝")\n\ndef get_card_value(rank):\n    values = {\n        \'2\': 2, \'3\': 3, \'4\': 4, \'5\': 5, \'6\': 6, \'7\': 7, \'8\': 8, \'9\': 9, \'10\': 10,\n        \'Jack\': 11, \'Queen\': 12, \'King\': 13, \'Ace\': 14\n    }\n    return values.get(rank, 0)\n\nif __name__ == "__main__":\n    play_card_game()'
         }
       ];
-    } else {
-      // Default multi-file generation
-      this.files = [
+    }
+
+    if (promptLower.includes('ping pong') || promptLower.includes('pong')) {
+      return [
         {
           path: 'index.html',
-          content: `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generated App</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Welcome to Your Generated App</h1>
-        <p>This application was generated based on your request: ${this.prompt}</p>
-
-        <div class="content">
-            <button onclick="showMessage()">Click me!</button>
-            <p id="message" class="hidden">Hello from your generated app! 🚀</p>
-        </div>
-    </div>
-    <script src="script.js"></script>
-</body>
-</html>`
+          content: '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta\n      name="viewport"\n      content="width=device-width, initial-scale=1.0"\n    />\n    <title>Ping Pong Game</title>\n    <link rel="stylesheet" href="styles.css" />\n  </head>\n  <body>\n    <div class="game-container">\n      <h1>Ping Pong Game</h1>\n      <div class="game-info">\n        <div class="score">\n          <span>Player: <span id="playerScore">0</span></span>\n          <span>Computer: <span id="computerScore">0</span></span>\n        </div>\n        <button id="startButton">Start Game</button>\n      </div>\n      <canvas id="gameCanvas" width="800" height="400"></canvas>\n    </div>\n    <script src="script.js"></script>\n  </body>\n</html>'
         },
         {
           path: 'styles.css',
-          content: `/* Generated App Styles */
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 40px 20px;
-    text-align: center;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-h1 {
-    color: #333;
-    margin-bottom: 20px;
-    font-size: 2.5rem;
-}
-
-.content {
-    margin-top: 40px;
-}
-
-button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    font-size: 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: transform 0.2s ease;
-}
-
-button:hover {
-    transform: translateY(-2px);
-}
-
-.hidden {
-    display: none;
-}
-
-#message {
-    margin-top: 20px;
-    padding: 15px;
-    background: #f0f8ff;
-    border-radius: 8px;
-    color: #333;
-    font-size: 18px;
-}`
+          content: '/* Ping Pong Game Styles */\n.game-container {\n  max-width: 800px;\n  margin: 0 auto;\n  text-align: center;\n  font-family: Arial, sans-serif;\n}\n\n.game-container h1 {\n  color: #333;\n  margin-bottom: 20px;\n}\n\n.game-info {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-bottom: 20px;\n  padding: 0 20px;\n}\n\n.score {\n  display: flex;\n  gap: 40px;\n}\n\n.score span {\n  font-size: 18px;\n  font-weight: bold;\n}\n\n#startButton {\n  padding: 10px 20px;\n  background: #4caf50;\n  color: white;\n  border: none;\n  border-radius: 5px;\n  cursor: pointer;\n  font-size: 16px;\n}\n\n#startButton:hover {\n  background: #45a049;\n}\n\n#gameCanvas {\n  border: 2px solid #333;\n  background: #000;\n  display: block;\n  margin: 0 auto;\n}'
         },
         {
           path: 'script.js',
-          content: `// Generated App JavaScript
-function showMessage() {
-    const message = document.getElementById('message');
-    message.classList.remove('hidden');
+          content: '// Ping Pong Game Logic\nconst canvas = document.getElementById(\'gameCanvas\');\nconst ctx = canvas.getContext(\'2d\');\nconst startButton = document.getElementById(\'startButton\');\nconst playerScoreElement = document.getElementById(\'playerScore\');\nconst computerScoreElement = document.getElementById(\'computerScore\');\n\n// Game variables\nlet ball = {\n  x: canvas.width / 2,\n  y: canvas.height / 2,\n  radius: 10,\n  speed: 5,\n  dx: 5,\n  dy: 5\n};\n\nlet player = {\n  x: 0,\n  y: canvas.height / 2 - 50,\n  width: 10,\n  height: 100,\n  speed: 8,\n  score: 0\n};\n\nlet computer = {\n  x: canvas.width - 10,\n  y: canvas.height / 2 - 50,\n  width: 10,\n  height: 100,\n  speed: 6,\n  score: 0\n};\n\nlet gameRunning = false;\n\n// Draw functions\nfunction drawBall() {\n  ctx.beginPath();\n  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);\n  ctx.fillStyle = \'#fff\';\n  ctx.fill();\n  ctx.closePath();\n}\n\nfunction drawPaddle(x, y, width, height) {\n  ctx.fillStyle = \'#fff\';\n  ctx.fillRect(x, y, width, height);\n}\n\nfunction drawScore() {\n  ctx.fillStyle = \'#fff\';\n  ctx.font = \'24px Arial\';\n  ctx.textAlign = \'center\';\n  ctx.fillText(player.score, canvas.width / 4, 50);\n  ctx.fillText(computer.score, (3 * canvas.width) / 4, 50);\n}\n\nfunction drawCenterLine() {\n  ctx.setLineDash([5, 15]);\n  ctx.beginPath();\n  ctx.moveTo(canvas.width / 2, 0);\n  ctx.lineTo(canvas.width / 2, canvas.height);\n  ctx.strokeStyle = \'#fff\';\n  ctx.stroke();\n  ctx.setLineDash([]);\n}\n\n// Game functions\nfunction updateBall() {\n  ball.x += ball.dx;\n  ball.y += ball.dy;\n\n  // Ball collision with top and bottom walls\n  if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {\n    ball.dy = -ball.dy;\n  }\n\n  // Ball collision with paddles\n  if (\n    ball.x - ball.radius < player.x + player.width &&\n    ball.y > player.y &&\n    ball.y < player.y + player.height\n  ) {\n    ball.dx = -ball.dx;\n    ball.speed += 0.5;\n  }\n\n  if (\n    ball.x + ball.radius > computer.x &&\n    ball.y > computer.y &&\n    ball.y < computer.y + computer.height\n  ) {\n    ball.dx = -ball.dx;\n    ball.speed += 0.5;\n  }\n\n  // Ball goes off screen\n  if (ball.x < 0) {\n    computer.score++;\n    computerScoreElement.textContent = computer.score;\n    resetBall();\n  } else if (ball.x > canvas.width) {\n    player.score++;\n    playerScoreElement.textContent = player.score;\n    resetBall();\n  }\n}\n\nfunction updateComputer() {\n  const computerCenter = computer.y + computer.height / 2;\n  const ballCenter = ball.y;\n\n  if (ballCenter < computerCenter - 20) {\n    computer.y -= computer.speed;\n  } else if (ballCenter > computerCenter + 20) {\n    computer.y += computer.speed;\n  }\n\n  // Keep paddle in bounds\n  if (computer.y < 0) computer.y = 0;\n  if (computer.y + computer.height > canvas.height) {\n    computer.y = canvas.height - computer.height;\n  }\n}\n\nfunction resetBall() {\n  ball.x = canvas.width / 2;\n  ball.y = canvas.height / 2;\n  ball.dx = -ball.dx;\n  ball.speed = 5;\n}\n\nfunction gameLoop() {\n  if (!gameRunning) return;\n\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n\n  drawCenterLine();\n  drawBall();\n  drawPaddle(player.x, player.y, player.width, player.height);\n  drawPaddle(computer.x, computer.y, computer.width, computer.height);\n  drawScore();\n\n  updateBall();\n  updateComputer();\n\n  requestAnimationFrame(gameLoop);\n}\n\n// Event listeners\ndocument.addEventListener(\'keydown\', (e) => {\n  if (e.key === \'ArrowUp\') {\n    player.y -= player.speed;\n  } else if (e.key === \'ArrowDown\') {\n    player.y += player.speed;\n  }\n\n  // Keep player paddle in bounds\n  if (player.y < 0) player.y = 0;\n  if (player.y + player.height > canvas.height) {\n    player.y = canvas.height - player.height;\n  }\n});\n\nstartButton.addEventListener(\'click\', () => {\n  if (!gameRunning) {\n    gameRunning = true;\n    startButton.textContent = \'Restart Game\';\n    gameLoop();\n  } else {\n    // Reset game\n    player.score = 0;\n    computer.score = 0;\n    playerScoreElement.textContent = \'0\';\n    computerScoreElement.textContent = \'0\';\n    resetBall();\n    gameRunning = true;\n    gameLoop();\n  }\n});\n\n// Initialize game\nresetBall();'
+        }
+      ];
+    }
 
-    // Animate the message
-    message.style.animation = 'fadeInUp 0.5s ease-out';
+    return [
+      {
+        path: 'index.html',
+        content: '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta\n      name="viewport"\n      content="width=device-width, initial-scale=1.0"\n    />\n    <title>Generated App</title>\n    <link rel="stylesheet" href="styles.css" />\n  </head>\n  <body>\n    <div class="container">\n      <h1>Welcome to Your Generated App</h1>\n      <p>\n        This application was generated based on your request:\n        "' + this.prompt + '"\n      </p>\n      <div class="content">\n        <button onclick="showMessage()">Click me!</button>\n        <p id="message" class="hidden">\n          Hello from your generated app! 🚀\n        </p>\n      </div>\n    </div>\n    <script src="script.js"></script>\n  </body>\n</html>'
+      },
+      {
+        path: 'styles.css',
+        content: '/* Generated App Styles */\n.container {\n  max-width: 800px;\n  margin: 0 auto;\n  padding: 40px 20px;\n  text-align: center;\n  font-family:\n    -apple-system,\n    BlinkMacSystemFont,\n    \'Segoe UI\',\n    Roboto,\n    sans-serif;\n}\n\nh1 {\n  color: #333;\n  margin-bottom: 20px;\n  font-size: 2.5rem;\n}\n\n.content {\n  margin-top: 40px;\n}\n\nbutton {\n  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n  color: white;\n  border: none;\n  padding: 12px 24px;\n  font-size: 16px;\n  border-radius: 8px;\n  cursor: pointer;\n  transition: transform 0.2s ease;\n}\n\nbutton:hover {\n  transform: translateY(-2px);\n}\n\n.hidden {\n  display: none;\n}\n\n#message {\n  margin-top: 20px;\n  padding: 15px;\n  background: #f0f8ff;\n  border-radius: 8px;\n  color: #333;\n  font-size: 18px;\n}'
+      },
+      {
+        path: 'script.js',
+        content: `function showMessage() {
+  const message = document.getElementById('message');
+  message.classList.remove('hidden');
+
+  // Animate the message
+  message.style.animation = 'fadeInUp 0.5s ease-out';
 }
 
 // Add some interactivity
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Generated app loaded successfully!');
+document.addEventListener('DOMContentLoaded', function () {
+  console.log('Generated app loaded successfully!');
 
-    // Add click animation to button
-    const button = document.querySelector('button');
-    button.addEventListener('click', function() {
-        this.style.transform = 'scale(0.95)';
-        setTimeout(() => {
-            this.style.transform = 'scale(1)';
-        }, 150);
-    });
+  // Add click animation to button
+  const button = document.querySelector('button');
+  button.addEventListener('click', function () {
+    this.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+      this.style.transform = 'scale(1)';
+    }, 150);
+  });
 });
 
 // CSS Animation (injected via JavaScript)
 const style = document.createElement('style');
-style.textContent = /*css*/\`
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-\`;
+style.textContent = [
+  '@keyframes fadeInUp {',
+  '  from {',
+  '    opacity: 0;',
+  '    transform: translateY(20px);',
+  '  }',
+  '  to {',
+  '    opacity: 1;',
+  '    transform: translateY(0);',
+  '  }',
+  '}',
+  ''
+].join('\\n');
 document.head.appendChild(style);`
-        }
-      ];
-    }
+      }
+    ];
   }
 
   async *generateStream(): AsyncGenerator<StreamMessage> {
+    if (!this.prepared) {
+      throw new Error('Streaming generator must be prepared before use');
+    }
+
     for (let i = 0; i < this.files.length; i++) {
       const file = this.files[i];
 
-      // Send FILE_OPEN event
       yield { type: 'FILE_OPEN', path: file.path };
 
-      // Stream the file content line by line with small delays
-      const lines = file.content.split('\n');
+      const lines = this.getFormattedLines(file.content);
 
       for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const isLastLine = lineIndex === lines.length - 1;
         const line = lines[lineIndex];
 
-        // Add the line to the file content
+        if (isLastLine && line === '') {
+          continue;
+        }
+
+        const chunk = isLastLine ? line : line + '\n';
+
         yield {
           type: 'APPEND',
           path: file.path,
-          text: line + (lineIndex < lines.length - 1 ? '\n' : '')
+          text: chunk
         };
 
-        // Small delay to create streaming effect (50-150ms per line)
         const delay = Math.random() * 100 + 50;
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      // Send FILE_CLOSE event
       yield { type: 'FILE_CLOSE', path: file.path };
 
-      // Small pause between files
       if (i < this.files.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 
-    // Send COMPLETE event
     yield { type: 'COMPLETE' };
   }
+
 }
 
 export async function POST(request: NextRequest) {
@@ -348,38 +277,36 @@ export async function POST(request: NextRequest) {
       return new Response('Prompt is required', { status: 400 });
     }
 
-    // Create mock generator
     const generator = new MockStreamingGenerator(prompt);
+    await generator.prepare();
 
-    // Return SSE stream
     const stream = new ReadableStream({
       async start(controller) {
         try {
           for await (const message of generator.generateStream()) {
-            // Format message for SSE
             let data = '';
             switch (message.type) {
               case 'FILE_OPEN':
-                data = `FILE_OPEN ${message.path}`;
+                data = JSON.stringify({ type: 'FILE_OPEN', path: message.path });
                 break;
               case 'APPEND':
-                data = `APPEND ${message.text}`;
+                data = JSON.stringify({ type: 'APPEND', text: message.text });
                 break;
               case 'FILE_CLOSE':
-                data = `FILE_CLOSE ${message.path}`;
+                data = JSON.stringify({ type: 'FILE_CLOSE', path: message.path });
                 break;
               case 'COMPLETE':
-                data = 'COMPLETE';
+                data = JSON.stringify({ type: 'COMPLETE' });
                 break;
               case 'ERROR':
-                data = `ERROR ${message.message}`;
+                data = JSON.stringify({ type: 'ERROR', message: message.message });
                 break;
             }
 
-            controller.enqueue(`data: ${data}\n\n`);
+            controller.enqueue('data: ' + data + '\n\n');
           }
         } catch (error: any) {
-          controller.enqueue(`data: ERROR ${error?.message || 'Unknown error'}\n\n`);
+          controller.enqueue('data: ' + JSON.stringify({ type: 'ERROR', message: error?.message || 'Unknown error' }) + '\n\n');
         } finally {
           controller.close();
         }
@@ -390,11 +317,10 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
+        Connection: 'keep-alive'
+      }
     });
-
   } catch (error: any) {
-    return new Response(`Error: ${error?.message || 'Unknown error'}`, { status: 500 });
+    return new Response('Error: ' + (error?.message || 'Unknown error'), { status: 500 });
   }
 }

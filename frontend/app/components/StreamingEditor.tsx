@@ -77,14 +77,96 @@ export default function StreamingEditor({
     setFiles(prev => prev.map(file => {
       if (file.path === path) {
         const newContent = file.content + text;
-        // Update editor in real-time
-        if (path === activeFile) {
-          // The editor will be updated via the content prop
-        }
+        console.log('Updated content for', path, 'new length:', newContent.length);
+        console.log('Content preview:', newContent.substring(0, 200) + '...');
         return { ...file, content: newContent };
       }
       return file;
     }));
+
+    // Force editor update for active file to ensure formatting
+    if (path === activeFile) {
+      // Use multiple update strategies for better Monaco compatibility
+      setFiles(prev => [...prev]);
+      console.log('Immediate editor update for', path);
+
+      // Additional delayed update to ensure formatting
+      setTimeout(() => {
+        setFiles(prev => [...prev]);
+        console.log('Delayed editor update for', path);
+      }, 10);
+    }
+  };
+
+  // Force editor update with proper formatting
+  const forceEditorUpdate = (path: string) => {
+    if (path === activeFile) {
+      console.log('Forcing editor update for', path);
+      const currentFile = files.find(f => f.path === path);
+      if (currentFile) {
+        console.log('Current content length:', currentFile.content.length);
+        console.log('Current line count:', currentFile.content.split('\n').length);
+        console.log('Content ends with newline:', currentFile.content.endsWith('\n'));
+      }
+
+      // Trigger state update to force Monaco to re-render with new content
+      setFiles(prev => [...prev]);
+    }
+  };
+
+  // Ensure content is properly formatted for Monaco
+  const ensureProperFormatting = (content: string): string => {
+    if (!content) return content;
+
+    // Split into lines and ensure proper formatting
+    const lines = content.split('\n');
+    const formattedLines: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Ensure line doesn't have trailing spaces
+      const trimmedLine = line.trimEnd();
+
+      // Add proper line ending
+      if (i < lines.length - 1) {
+        formattedLines.push(trimmedLine);
+      } else {
+        // Last line - don't add extra newline if already ends with one
+        formattedLines.push(trimmedLine);
+      }
+    }
+
+    return formattedLines.join('\n');
+  };
+
+  // Format content for Monaco Editor
+  const formatContentForEditor = (content: string): string => {
+    if (!content) return content;
+
+    // Ensure content ends with newline for proper formatting
+    let formatted = content.endsWith('\n') ? content : content + '\n';
+
+    // Log content for debugging
+    console.log('Formatting content for Monaco:');
+    console.log('- Original length:', content.length);
+    console.log('- Formatted length:', formatted.length);
+    console.log('- Line count:', formatted.split('\n').length);
+    console.log('- Content preview:', formatted.substring(0, 150) + '...');
+
+    // Ensure proper line endings for Monaco
+    formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    // Ensure no trailing spaces on lines
+    formatted = formatted.split('\n').map(line => line.trimEnd()).join('\n');
+
+    // Ensure final newline
+    if (!formatted.endsWith('\n')) {
+      formatted += '\n';
+    }
+
+    console.log('Final formatted length:', formatted.length);
+    return formatted;
   };
 
   // Close a file tab
@@ -182,45 +264,56 @@ export default function StreamingEditor({
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            eventCount++;
-            console.log(`Event ${eventCount}:`, data);
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
 
-            if (data.startsWith('FILE_OPEN ')) {
-              currentPath = data.slice(10).trim();
-              console.log('Opening file:', currentPath);
-              openTab(currentPath);
-            } else if (data.startsWith('APPEND ')) {
-              const text = data.slice(7);
-              if (currentPath) {
-                console.log('Appending to', currentPath, ':', text.length, 'characters');
-                appendToFile(currentPath, text);
+            try {
+              const data = JSON.parse(jsonStr);
+              eventCount++;
+              console.log(`Event ${eventCount}:`, data);
+
+              if (data.type === 'FILE_OPEN') {
+                currentPath = data.path;
+                console.log('Opening file:', currentPath);
+                openTab(currentPath);
+              } else if (data.type === 'APPEND') {
+                const text = data.text;
+                if (currentPath) {
+                  console.log('Appending to', currentPath, ':', text.length, 'characters');
+                  console.log('Text preview:', text.substring(0, 100) + '...');
+                  appendToFile(currentPath, text);
+
+                  // Force editor update immediately for better formatting
+                  forceEditorUpdate(currentPath);
+                }
+              } else if (data.type === 'FILE_CLOSE') {
+                const closedPath = data.path;
+                console.log('Closing file:', closedPath);
+                closeTab(closedPath);
+              } else if (data.type === 'COMPLETE') {
+                console.log('Streaming complete - files generated:', files.length);
+                console.log('Files:', files.map(f => ({ path: f.path, contentLength: f.content.length })));
+
+                // Keep streaming active but mark as complete for UI feedback
+                setIsStreaming(false);
+
+                // Ensure we have files before calling completion callback
+                if (files.length > 0) {
+                  onStreamingComplete?.(files);
+                } else {
+                  console.warn('No files generated, but streaming completed');
+                  onStreamingComplete?.([]);
+                }
+                break;
+              } else if (data.type === 'ERROR') {
+                const errorMsg = data.message;
+                console.error('Streaming error:', errorMsg);
+                onStreamingError?.(errorMsg);
+                setIsStreaming(false);
+                break;
               }
-            } else if (data.startsWith('FILE_CLOSE ')) {
-              const closedPath = data.slice(11).trim();
-              console.log('Closing file:', closedPath);
-              closeTab(closedPath);
-            } else if (data === 'COMPLETE') {
-              console.log('Streaming complete - files generated:', files.length);
-              console.log('Files:', files.map(f => ({ path: f.path, contentLength: f.content.length })));
-
-              // Keep streaming active but mark as complete for UI feedback
-              setIsStreaming(false);
-
-              // Ensure we have files before calling completion callback
-              if (files.length > 0) {
-                onStreamingComplete?.(files);
-              } else {
-                console.warn('No files generated, but streaming completed');
-                onStreamingComplete?.([]);
-              }
-              break;
-            } else if (data.startsWith('ERROR ')) {
-              const errorMsg = data.slice(6);
-              console.error('Streaming error:', errorMsg);
-              onStreamingError?.(errorMsg);
-              setIsStreaming(false);
-              break;
+            } catch (e) {
+              console.error('Failed to parse SSE data:', jsonStr, e);
             }
           }
         }
@@ -247,10 +340,20 @@ export default function StreamingEditor({
     setIsStreaming(false);
   };
 
-  // Get current active file content
+  // Get current active file content with proper formatting
   const getActiveFileContent = (): string => {
     const file = files.find(f => f.path === activeFile);
-    return file?.content || '// Generated code will appear here...\n// Start streaming to see real-time code generation!';
+    const content = file?.content || '';
+
+    if (!content) {
+      return '// Generated code will appear here...\n// Start streaming to see real-time code generation!';
+    }
+
+    // Format content for Monaco Editor
+    const formatted = ensureProperFormatting(content);
+    console.log('Sending to editor:', formatted.length, 'characters');
+    console.log('Editor content preview:', formatted.substring(0, 100) + '...');
+    return formatted;
   };
 
   // Get current active file for display name
