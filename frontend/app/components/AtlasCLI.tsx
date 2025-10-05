@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { ShellExecutor } from '@/services/shellExecutor';
 
 interface CLICommand {
   id: string;
@@ -17,9 +18,19 @@ interface AtlasCLIProps {
   generatedCode?: string;
   executionResult?: any;
   sandboxLogs?: any[];
+  onFileModified?: (filePath: string, operation: string) => void;
+  onCliActivity?: (activity: { isActive: boolean; currentTask?: string; progress?: number }) => void;
 }
 
-export default function AtlasCLI({ onCommand, isGenerating, generatedCode, executionResult, sandboxLogs }: AtlasCLIProps) {
+export default function AtlasCLI({
+  onCommand,
+  isGenerating,
+  generatedCode,
+  executionResult,
+  sandboxLogs,
+  onFileModified,
+  onCliActivity
+}: AtlasCLIProps) {
   const [commands, setCommands] = useState<CLICommand[]>([
     {
       id: 'atlas-help-1',
@@ -52,8 +63,16 @@ Ready to build something amazing? Just describe it! ✨`,
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [environmentInfo, setEnvironmentInfo] = useState<any>(null);
+  const [modifiedFiles, setModifiedFiles] = useState<Set<string>>(new Set());
+  const [cliActivity, setCliActivity] = useState<{
+    isActive: boolean;
+    currentTask?: string;
+    progress?: number;
+  }>({ isActive: false });
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const shellExecutor = ShellExecutor.getInstance();
 
   // Auto-scroll to bottom when new commands are added
   useEffect(() => {
@@ -62,12 +81,61 @@ Ready to build something amazing? Just describe it! ✨`,
     }
   }, [commands]);
 
-  // Focus input on component mount
+  // Focus input on component mount and load environment info
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
+
+    // Load environment information
+    loadEnvironmentInfo();
   }, []);
+
+  const loadEnvironmentInfo = async () => {
+    try {
+      const info = await shellExecutor.getEnvironmentInfo();
+      setEnvironmentInfo(info);
+    } catch (error) {
+      console.error('Failed to load environment info:', error);
+    }
+  };
+
+  // Track CLI activity for editor integration
+  const updateCliActivity = (isActive: boolean, currentTask?: string, progress?: number) => {
+    setCliActivity({ isActive, currentTask, progress });
+    onCliActivity?.({ isActive, currentTask, progress });
+  };
+
+  // Track file modifications for editor integration
+  const trackFileModification = (filePath: string, operation: string) => {
+    setModifiedFiles(prev => new Set([...prev, filePath]));
+    onFileModified?.(filePath, operation);
+
+    // Add visual feedback in CLI
+    addCommand(`File operation: ${operation}`, `📄 Modified: ${filePath}`, 'info');
+  };
+
+  // Extract file paths from command output
+  const extractFilePaths = (output: string): string[] => {
+    const filePaths: string[] = [];
+    const lines = output.split('\n');
+
+    for (const line of lines) {
+      // Look for common file operation patterns
+      const fileMatch = line.match(/(?:created|modified|updated|wrote|generated):\s*([^\s]+)/);
+      if (fileMatch) {
+        filePaths.push(fileMatch[1]);
+      }
+
+      // Look for file paths in npm/yarn output
+      const npmMatch = line.match(/(?:npm|yarn)\s+(?:install|add|remove).+?([^\s]+\.(js|ts|tsx|jsx|json|md))?/);
+      if (npmMatch) {
+        filePaths.push(npmMatch[1]);
+      }
+    }
+
+    return filePaths;
+  };
 
   // Update commands when external state changes
   useEffect(() => {
@@ -159,6 +227,35 @@ Ready to build something amazing? Just describe it! ✨`,
         break;
       case 'history':
         showCommandHistory();
+        break;
+      case 'env':
+      case 'environment':
+        await showEnvironmentInfo();
+        break;
+      case 'ls':
+      case 'dir':
+        await executeListDirectory(args);
+        break;
+      case 'cat':
+      case 'read':
+        await executeReadFile(args);
+        break;
+      case 'run':
+      case 'npm':
+      case 'yarn':
+        await executePackageScript(args);
+        break;
+      case 'install':
+      case 'add':
+        await executePackageInstall(args);
+        break;
+      case 'git':
+        await executeGitCommand(args);
+        break;
+      case 'shell':
+      case 'exec':
+      case 'execute':
+        await executeShellCommand(args);
         break;
       default:
         // If command doesn't match any specific atlas subcommand, treat as direct prompt
@@ -293,6 +390,15 @@ Ready to build something amazing? Just describe it! ✨`,
   "Design a login form with validation"
   "Create a simple ping pong game"
 
+🔧 Shell Commands:
+  env                    Show environment information
+  ls [directory]         List files and directories
+  cat <file>             Read and display file contents
+  run <script>           Run npm/yarn scripts (dev, build, test)
+  install <packages>     Install npm packages
+  git [command]          Execute git commands
+  shell <command>        Execute any shell command
+
 🔧 Advanced Commands:
   Type /commands to see all available commands
 
@@ -320,10 +426,18 @@ Ready to build something amazing? Just describe it! ✨`;
   atlas quality               Run code quality analysis
   atlas status                Show current project status
 
+💻 Local Shell Operations:
+  env                         Show environment information
+  ls [directory]              List files and directories
+  cat <file>                  Read and display file contents
+  run <script>                Run npm/yarn scripts (dev, build, test)
+  install <packages>          Install npm packages
+  git [command]               Execute git commands (status, add, commit, etc.)
+  shell <command>             Execute any shell command
+
 🛠️ Utility Commands:
   atlas clear                 Clear terminal history
   atlas help                  Show quick start guide
-  /help                       Show quick start guide
   /commands                   Show this commands list
 
 💡 Pro Tips:
@@ -356,6 +470,216 @@ Autonomous Agent: Atlas 🗺️
 Mode: Interactive Development
 Environment: Local Execution`;
     addCommand('atlas status', status, 'info');
+  };
+
+  const showEnvironmentInfo = async () => {
+    try {
+      if (!environmentInfo) {
+        await loadEnvironmentInfo();
+      }
+
+      const info = environmentInfo || await shellExecutor.getEnvironmentInfo();
+      const envDisplay = `🖥️ Environment Information:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 Platform: ${info.platform}
+📦 Node.js: ${info.nodeVersion}
+📋 NPM: ${info.npmVersion}
+🧶 Yarn: ${info.yarnVersion || 'Not installed'}
+🔧 Git: ${info.gitVersion || 'Not installed'}
+📁 Current Directory: ${info.currentDirectory}
+🛠️ Package Manager: ${info.packageManager.toUpperCase()}
+
+💡 Atlas can now execute local shell commands!
+Try: npm install, git status, ls, or any shell command`;
+      addCommand('env', envDisplay, 'info');
+    } catch (error: any) {
+      addCommand('env', `❌ Failed to get environment info: ${error.message}`, 'error');
+    }
+  };
+
+  const executeListDirectory = async (args: string[]) => {
+    try {
+      const dirPath = args[0] || '.';
+      const files = await shellExecutor.listDirectory(dirPath);
+
+      if (files.length === 0) {
+        addCommand(`ls ${dirPath}`, `📁 Directory is empty`, 'info');
+      } else {
+        const fileList = files.map(file => `  📄 ${file}`).join('\n');
+        addCommand(`ls ${dirPath}`, `📁 Contents of ${dirPath}:\n${fileList}`, 'info');
+      }
+    } catch (error: any) {
+      addCommand(`ls ${args.join(' ')}`, `❌ Failed to list directory: ${error.message}`, 'error');
+    }
+  };
+
+  const executeReadFile = async (args: string[]) => {
+    if (args.length === 0) {
+      addCommand('cat', '❌ Error: Please specify a file to read. Example: cat package.json', 'error');
+      return;
+    }
+
+    try {
+      const filePath = args[0];
+      const content = await shellExecutor.readFile(filePath);
+
+      if (content.length > 2000) {
+        addCommand(`cat ${filePath}`, `📄 File contents (truncated):\n${content.substring(0, 2000)}...\n\n💡 File is large (${content.length} chars). Showing first 2000 characters.`, 'info');
+      } else {
+        addCommand(`cat ${filePath}`, `📄 Contents of ${filePath}:\n${content}`, 'info');
+      }
+    } catch (error: any) {
+      addCommand(`cat ${args.join(' ')}`, `❌ Failed to read file: ${error.message}`, 'error');
+    }
+  };
+
+  const executePackageScript = async (args: string[]) => {
+    if (args.length === 0) {
+      addCommand('run', '❌ Error: Please specify a script to run. Example: run dev', 'error');
+      return;
+    }
+
+    try {
+      const scriptName = args[0];
+      updateCliActivity(true, `Running script: ${scriptName}`, 0);
+      addCommand(`run ${scriptName}`, `🚀 Executing script: ${scriptName}...`, 'info');
+
+      const result = await shellExecutor.runScript(scriptName);
+
+      if (result.success) {
+        updateCliActivity(false, undefined, 100);
+        const modifiedFilesList = extractFilePaths(result.output);
+        addCommand(`run ${scriptName}`, `✅ Script completed successfully:\n${result.output}`, 'success');
+
+        // Track any file modifications
+        modifiedFilesList.forEach(filePath => {
+          trackFileModification(filePath, 'script execution');
+        });
+      } else {
+        updateCliActivity(false);
+        addCommand(`run ${scriptName}`, `❌ Script failed:\n${result.error || result.output}`, 'error');
+      }
+    } catch (error: any) {
+      updateCliActivity(false);
+      addCommand(`run ${args.join(' ')}`, `❌ Failed to execute script: ${error.message}`, 'error');
+    }
+  };
+
+  const executePackageInstall = async (args: string[]) => {
+    if (args.length === 0) {
+      addCommand('install', '❌ Error: Please specify packages to install. Example: install react typescript', 'error');
+      return;
+    }
+
+    try {
+      const packages = args;
+      const dev = args.includes('--dev') || args.includes('-D');
+      const packagesToInstall = dev ? args.filter(p => p !== '--dev' && p !== '-D') : packages;
+
+      updateCliActivity(true, `Installing packages: ${packagesToInstall.join(', ')}`, 0);
+      addCommand(`install ${packages.join(' ')}`, `📦 Installing packages: ${packagesToInstall.join(', ')}...`, 'info');
+
+      const result = await shellExecutor.installPackages(packagesToInstall, dev);
+
+      if (result.success) {
+        updateCliActivity(false, undefined, 100);
+        const modifiedFilesList = extractFilePaths(result.output);
+        addCommand(`install ${packages.join(' ')}`, `✅ Packages installed successfully:\n${result.output}`, 'success');
+
+        // Track package.json and lock file modifications
+        trackFileModification('package.json', 'package installation');
+        if (environmentInfo?.packageManager === 'npm') {
+          trackFileModification('package-lock.json', 'package installation');
+        } else if (environmentInfo?.packageManager === 'yarn') {
+          trackFileModification('yarn.lock', 'package installation');
+        }
+
+        // Track any other file modifications
+        modifiedFilesList.forEach(filePath => {
+          trackFileModification(filePath, 'package installation');
+        });
+      } else {
+        updateCliActivity(false);
+        addCommand(`install ${packages.join(' ')}`, `❌ Package installation failed:\n${result.error || result.output}`, 'error');
+      }
+    } catch (error: any) {
+      updateCliActivity(false);
+      addCommand(`install ${args.join(' ')}`, `❌ Failed to install packages: ${error.message}`, 'error');
+    }
+  };
+
+  const executeGitCommand = async (args: string[]) => {
+    if (args.length === 0) {
+      // Show git status if no args provided
+      try {
+        const isGitRepo = await shellExecutor.isGitRepository();
+        if (!isGitRepo) {
+          addCommand('git', '❌ Not a git repository', 'error');
+          return;
+        }
+
+        const statusResult = await shellExecutor.getGitStatus();
+        if (statusResult.success) {
+          if (statusResult.output.trim() === '') {
+            addCommand('git status', '✅ Working directory clean', 'success');
+          } else {
+            addCommand('git status', `📊 Git status:\n${statusResult.output}`, 'info');
+          }
+        } else {
+          addCommand('git status', `❌ Failed to get git status: ${statusResult.error}`, 'error');
+        }
+      } catch (error: any) {
+        addCommand('git', `❌ Git command failed: ${error.message}`, 'error');
+      }
+      return;
+    }
+
+    try {
+      const gitCmd = args.join(' ');
+      const result = await shellExecutor.executeCommand(`git ${gitCmd}`);
+
+      if (result.success) {
+        addCommand(`git ${gitCmd}`, `✅ Git command completed:\n${result.output}`, 'success');
+      } else {
+        addCommand(`git ${gitCmd}`, `❌ Git command failed:\n${result.error || result.output}`, 'error');
+      }
+    } catch (error: any) {
+      addCommand(`git ${args.join(' ')}`, `❌ Git command failed: ${error.message}`, 'error');
+    }
+  };
+
+  const executeShellCommand = async (args: string[]) => {
+    if (args.length === 0) {
+      addCommand('shell', '❌ Error: Please specify a shell command to execute. Example: shell npm --version', 'error');
+      return;
+    }
+
+    try {
+      const command = args.join(' ');
+      updateCliActivity(true, `Executing: ${command}`, 0);
+      addCommand(`shell ${command}`, `🔧 Executing: ${command}...`, 'info');
+
+      const result = await shellExecutor.executeCommand(command);
+
+      // Extract file paths from output for tracking
+      const modifiedFilesList = extractFilePaths(result.output);
+
+      if (result.success) {
+        updateCliActivity(false, undefined, 100);
+        addCommand(`shell ${command}`, `✅ Command completed (${result.executionTime}ms):\n${result.output}`, 'success');
+
+        // Track any file modifications
+        modifiedFilesList.forEach(filePath => {
+          trackFileModification(filePath, 'shell command');
+        });
+      } else {
+        updateCliActivity(false);
+        addCommand(`shell ${command}`, `❌ Command failed (${result.executionTime}ms):\n${result.error || result.output}`, 'error');
+      }
+    } catch (error: any) {
+      updateCliActivity(false);
+      addCommand(`shell ${args.join(' ')}`, `❌ Shell execution failed: ${error.message}`, 'error');
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -393,7 +717,10 @@ Environment: Local Execution`;
       case 'Tab':
         e.preventDefault();
         // Auto-complete common commands
-        const commonCommands = ['atlas generate', 'atlas help', 'atlas status', 'atlas export'];
+        const commonCommands = [
+          'atlas generate', 'atlas help', 'atlas status', 'atlas export',
+          'env', 'ls', 'cat', 'run', 'install', 'git status', 'shell'
+        ];
         const matchingCommand = commonCommands.find(cmd => cmd.startsWith(currentCommand));
         if (matchingCommand) {
           setCurrentCommand(matchingCommand + ' ');
@@ -429,16 +756,46 @@ Environment: Local Execution`;
       {/* CLI Header */}
       <div className="flex items-center justify-between p-3 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+          <div className={`w-3 h-3 rounded-full ${cliActivity.isActive ? 'bg-blue-400 animate-pulse' : 'bg-green-400'}`}></div>
           <span className="text-green-400 font-bold">Atlas CLI</span>
           <span className="text-gray-400 text-xs">Genie Agent v1.0</span>
+          {cliActivity.isActive && (
+            <span className="text-xs text-blue-400 bg-blue-400/20 px-2 py-1 rounded">
+              {cliActivity.currentTask}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-400">
           <span>{commands.length} commands</span>
           <span>•</span>
-          <span>{isExecuting ? 'Executing...' : 'Ready'}</span>
+          <span>{modifiedFiles.size} files modified</span>
+          <span>•</span>
+          <span>{cliActivity.isActive ? 'Executing...' : 'Ready'}</span>
         </div>
       </div>
+
+      {/* Modified Files Banner */}
+      {modifiedFiles.size > 0 && (
+        <div className="p-2 bg-blue-500/20 border-b border-blue-400/30">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-blue-400">📁 Files modified by CLI:</span>
+            <div className="flex gap-1 flex-wrap">
+              {Array.from(modifiedFiles).map(file => (
+                <span key={file} className="bg-blue-400/20 text-blue-300 px-2 py-1 rounded">
+                  {file}
+                </span>
+              ))}
+            </div>
+            <button
+              onClick={() => setModifiedFiles(new Set())}
+              className="text-gray-400 hover:text-white ml-auto"
+              title="Clear file modification indicators"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* CLI Output Area */}
       <div
@@ -500,8 +857,8 @@ Environment: Local Execution`;
       {/* CLI Footer */}
       <div className="p-2 border-t border-slate-700/50 bg-slate-800/30 flex-shrink-0">
         <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>↑↓ for history • Tab for autocomplete • /commands to see all commands</span>
-          <span>Atlas is ready to build</span>
+          <span>↑↓ for history • Tab for autocomplete • Full local shell access</span>
+          <span>Atlas is ready to execute</span>
         </div>
       </div>
     </div>

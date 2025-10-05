@@ -81,6 +81,12 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string; name: string } | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [cliModifiedFiles, setCliModifiedFiles] = useState<Set<string>>(new Set());
+  const [cliActivity, setCliActivity] = useState<{
+    isActive: boolean;
+    currentTask?: string;
+    progress?: number;
+  }>({ isActive: false });
 
   const handleGenerate = async (prompt: string) => {
     const startTime = new Date();
@@ -591,6 +597,23 @@ export default function Home() {
     }
   };
 
+  const handleCliFileModified = (filePath: string, operation: string) => {
+    setCliModifiedFiles(prev => new Set([...prev, filePath]));
+    addToast(`CLI ${operation}: ${filePath}`, 'info');
+
+    // Auto-refresh file tree to show changes
+    // You could also trigger a file tree refresh here
+  };
+
+  const handleCliActivity = (activity: { isActive: boolean; currentTask?: string; progress?: number }) => {
+    setCliActivity(activity);
+
+    // Update header to show CLI activity
+    if (activity.isActive) {
+      addToast(`CLI: ${activity.currentTask}`, 'info');
+    }
+  };
+
   // Atlas CLI Event Listeners
   useEffect(() => {
     const handleAtlasExport = (event: any) => {
@@ -686,6 +709,17 @@ export default function Home() {
               <p className="text-xs text-gray-400 hidden sm:block">AI-Powered Development Environment</p>
             </div>
           </div>
+
+          {/* CLI Activity Indicator */}
+          {cliActivity.isActive && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/20 rounded-full border border-blue-400/30">
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+              <span className="text-xs text-blue-300 font-medium">Atlas CLI Active</span>
+              {cliActivity.currentTask && (
+                <span className="text-xs text-blue-200">• {cliActivity.currentTask}</span>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 md:gap-4">
             {isGenerating && (
@@ -875,6 +909,12 @@ export default function Home() {
               <span className="md:hidden">{sandboxLogs.length}</span>
               <span className="hidden lg:inline">•</span>
               <span className="hidden lg:inline">{checkpoints.length} checkpoints</span>
+              {cliModifiedFiles.size > 0 && (
+                <>
+                  <span className="hidden lg:inline">•</span>
+                  <span className="text-blue-400">{cliModifiedFiles.size} CLI files</span>
+                </>
+              )}
             </div>
 
             {/* Theme Toggle */}
@@ -924,6 +964,30 @@ export default function Home() {
         <aside className={`border-r border-slate-700/50 transition-all duration-300 ease-in-out flex flex-col ${
           isSidebarCollapsed ? 'w-0 overflow-hidden md:w-0' : 'w-48 lg:w-64'
         } ${isSidebarCollapsed ? 'hidden md:flex' : 'flex'}`}>
+          {/* CLI Modified Files Section */}
+          {cliModifiedFiles.size > 0 && (
+            <div className="p-3 border-b border-slate-700/50 bg-blue-500/10">
+              <h4 className="text-xs font-semibold text-blue-300 mb-2 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                CLI Modified ({cliModifiedFiles.size})
+              </h4>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {Array.from(cliModifiedFiles).map(filePath => (
+                  <div
+                    key={filePath}
+                    className="text-xs text-blue-200 bg-blue-500/20 px-2 py-1 rounded cursor-pointer hover:bg-blue-500/30 transition-colors"
+                    onClick={() => handleFileSelection(filePath)}
+                    title={`Click to open ${filePath}`}
+                  >
+                    📄 {filePath.split('/').pop()}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 min-h-0">
             <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
           </div>
@@ -995,6 +1059,8 @@ export default function Home() {
                   generatedCode={generatedCode}
                   executionResult={executionResult}
                   sandboxLogs={sandboxLogs}
+                  onFileModified={handleCliFileModified}
+                  onCliActivity={handleCliActivity}
                 />
               </div>
             </div>
