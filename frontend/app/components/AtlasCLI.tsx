@@ -12,6 +12,14 @@ interface CLICommand {
   executionTime?: number;
 }
 
+interface ThinkEvent {
+  kind: 'planning' | 'researching' | 'executing' | 'drafting' | 'user' | 'summary';
+  ts: string;
+  items?: string[];
+  text?: string;
+  output?: string;
+}
+
 interface AtlasCLIProps {
   onCommand: (command: string) => Promise<void>;
   isGenerating?: boolean;
@@ -74,6 +82,14 @@ Ready to build something amazing? Just describe it! ✨`,
     currentTask?: string;
     progress?: number;
   }>({ isActive: false });
+  const [isThinkMode, setIsThinkMode] = useState(() => {
+    // Load thinking mode preference from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('atlasThinkingMode');
+      return saved ? JSON.parse(saved) : true; // Default to enabled
+    }
+    return true;
+  });
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const shellExecutor = ShellExecutor.getInstance();
@@ -85,6 +101,78 @@ Ready to build something amazing? Just describe it! ✨`,
     }
   }, [commands]);
 
+  // Toggle thinking mode
+  const toggleThinkingMode = () => {
+    const newMode = !isThinkMode;
+    setIsThinkMode(newMode);
+    localStorage.setItem('atlasThinkingMode', JSON.stringify(newMode));
+
+    addCommand(
+      'atlas thinking-mode',
+      newMode
+        ? '✅ Thinking mode enabled - You will see detailed reasoning logs during code generation'
+        : '🔕 Thinking mode disabled - Only showing final results',
+      'info'
+    );
+  };
+
+  // Emit function for structured thinking mode logging
+  const emitToCLI = ({ kind, ts, items, text, output }: ThinkEvent) => {
+    // Skip if thinking mode is disabled
+    if (!isThinkMode) {
+      console.log(`[Thinking Mode OFF] Skipping ${kind} event`);
+      return;
+    }
+
+    const timestamp = ts || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    let formattedOutput = '';
+
+    // Color coding for different event types (matching Atlas specification)
+    const colors = {
+      planning: '\x1b[35m',    // magenta
+      researching: '\x1b[36m', // cyan
+      executing: '\x1b[32m',   // green
+      drafting: '\x1b[33m',    // yellow
+      user: '\x1b[34m',        // blue
+      summary: '\x1b[37m'      // white
+    };
+
+    const color = colors[kind] || '\x1b[37m';
+    const reset = '\x1b[0m';
+    const kindLabel = kind.charAt(0).toUpperCase() + kind.slice(1);
+
+    // Format with Atlas-style output
+    formattedOutput += `${color}[${kindLabel}]${reset} ${timestamp}\n`;
+
+    if (items?.length) {
+      items.forEach(item => formattedOutput += `  • ${item}\n`);
+    }
+
+    if (text) {
+      formattedOutput += `  ${text}\n`;
+    }
+
+    if (output) {
+      formattedOutput += `\n${output}\n`;
+    }
+
+    formattedOutput += '\n';
+
+    // Add to CLI display as a special thinking command
+    const thinkingCommand: CLICommand = {
+      id: `thinking-${kind}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      command: `[${kindLabel}]`,
+      output: formattedOutput.trim(),
+      timestamp: new Date(),
+      type: 'info'
+    };
+
+    setCommands(prev => [...prev, thinkingCommand]);
+
+    // Also log to console for debugging
+    console.log(`[${timestamp}] ${kindLabel}:`, { items, text, output });
+  };
+
   // Focus input on component mount and load environment info
   useEffect(() => {
     if (inputRef.current) {
@@ -93,6 +181,17 @@ Ready to build something amazing? Just describe it! ✨`,
 
     // Load environment information
     loadEnvironmentInfo();
+
+    // Expose handler for thinking events from StreamingEditor
+    (window as any).handleThinkingEvent = (event: ThinkEvent) => {
+      console.log('[AtlasCLI] Received thinking event from StreamingEditor:', event);
+      emitToCLI(event);
+    };
+
+    // Cleanup
+    return () => {
+      delete (window as any).handleThinkingEvent;
+    };
   }, []);
 
   const loadEnvironmentInfo = async () => {
@@ -144,12 +243,42 @@ Ready to build something amazing? Just describe it! ✨`,
   // Update commands when external state changes
   useEffect(() => {
     if (isGenerating) {
+      // Auto-enable thinking mode when code generation starts
+      setIsThinkMode(true);
+
+      // Emit planning event for code generation
+      emitToCLI({
+        kind: 'planning',
+        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        items: [
+          'Analyzing prompt requirements and context',
+          'Selecting appropriate AI provider and model',
+          'Planning code structure and implementation approach',
+          'Preparing real-time streaming environment'
+        ]
+      });
+
       addCommand('atlas generate "..."', '🤖 Atlas is generating code...', 'info');
     }
   }, [isGenerating]);
 
   useEffect(() => {
     if (generatedCode && !isGenerating) {
+      // Emit summary when code generation completes
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'summary',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: 'Code generation completed successfully',
+          output: `Generated ${generatedCode.length} characters of code`
+        });
+
+        // Reset thinking mode after completion
+        setTimeout(() => {
+          setIsThinkMode(false);
+        }, 2000); // Small delay to show the summary
+      }
+
       addCommand('atlas generate "..."', `✅ Code generated successfully (${generatedCode.length} characters)`, 'success');
     }
   }, [generatedCode, isGenerating]);
@@ -200,14 +329,51 @@ Ready to build something amazing? Just describe it! ✨`,
     setIsExecuting(true);
 
     try {
+      // Emit planning event if in think mode
+      if (isThinkMode) {
+        const planningSteps = [
+          'Parsing command structure and arguments',
+          'Identifying command type and validation requirements',
+          'Preparing execution environment and dependencies',
+          'Setting up error handling and logging'
+        ];
+        emitToCLI({
+          kind: 'planning',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          items: planningSteps
+        });
+      }
+
       // Parse and execute command
       await parseAndExecuteCommand(cmd);
     } catch (error: any) {
       const executionTime = Date.now() - startTime;
+
+      // Emit error in think mode
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'executing',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Command execution failed: ${error.message}`,
+          output: `Execution time: ${executionTime}ms`
+        });
+      }
+
       addCommand(cmd, `❌ Error: ${error.message}`, 'error', executionTime);
     } finally {
       setIsExecuting(false);
       setCurrentCommand('');
+
+      // Emit summary if in think mode
+      if (isThinkMode) {
+        const totalTime = Date.now() - startTime;
+        emitToCLI({
+          kind: 'summary',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Command execution completed`,
+          output: `Total execution time: ${totalTime}ms`
+        });
+      }
     }
   };
 
@@ -216,7 +382,28 @@ Ready to build something amazing? Just describe it! ✨`,
     const baseCommand = parts[0];
     const args = parts.slice(1);
 
-    console.log('[Atlas CLI] Parsing command:', { cmd, baseCommand, args });
+    // Check for --think flag
+    const thinkIndex = args.findIndex(arg => arg === '--think');
+    const hasThinkFlag = thinkIndex !== -1;
+
+    if (hasThinkFlag) {
+      setIsThinkMode(true);
+      // Remove --think from args for processing
+      args.splice(thinkIndex, 1);
+    } else {
+      setIsThinkMode(false);
+    }
+
+    console.log('[Atlas CLI] Parsing command:', { cmd, baseCommand, args, thinkMode: hasThinkFlag });
+
+    // Emit user event if in think mode
+    if (hasThinkFlag) {
+      emitToCLI({
+        kind: 'user',
+        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        text: `Command: ${cmd}`
+      });
+    }
 
     switch (baseCommand) {
       case 'atlas':
@@ -230,6 +417,10 @@ Ready to build something amazing? Just describe it! ✨`,
         break;
       case '/commands':
         addCommand(cmd, getCommandsList(), 'info');
+        break;
+      case 'think':
+      case 'thinking':
+        toggleThinkingMode();
         break;
       case 'history':
         showCommandHistory();
@@ -317,9 +508,36 @@ Ready to build something amazing? Just describe it! ✨`,
           addCommand('atlas generate', '❌ Error: Please provide a prompt. Example: atlas generate "Create a React todo app"', 'error');
           return;
         }
+
+        // Emit drafting event if in think mode
+        if (isThinkMode) {
+          emitToCLI({
+            kind: 'drafting',
+            ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            text: `Generating code for prompt: "${prompt}"`,
+            items: [
+              'Analyzing prompt requirements and constraints',
+              'Planning code structure and file organization',
+              'Preparing streaming session for real-time generation',
+              'Setting up editor integration for live updates'
+            ]
+          });
+        }
+
         // Always use streaming for generate
         if ((window as any).startStreamingSession) {
           console.log('Starting streaming session with prompt:', prompt);
+
+          // Emit executing event for streaming start
+          if (isThinkMode) {
+            emitToCLI({
+              kind: 'executing',
+              ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              text: 'Starting real-time code streaming session',
+              output: 'Switching to editor view for live code generation'
+            });
+          }
+
           // Switch to editor view before starting streaming
           if ((window as any).switchToEditorView) {
             (window as any).switchToEditorView();
@@ -417,6 +635,12 @@ Ready to build something amazing? Just describe it! ✨`,
         addCommand('atlas help', getHelpText(), 'info');
         break;
 
+      case 'think':
+      case 'thinking':
+      case 'thinking-mode':
+        toggleThinkingMode();
+        break;
+
       default:
         addCommand('atlas ' + subCommand, `❌ Unknown atlas command: ${subCommand}. Type "atlas help" for available commands.`, 'error');
     }
@@ -448,6 +672,10 @@ Ready to build something amazing? Just describe it! ✨`,
   install <packages>           Install npm packages
   git [command]                Execute git commands
   shell <command>              Execute any shell command
+
+🧠 Thinking Mode:
+  think / thinking             Toggle thinking mode on/off
+  Click the 🧠 button in the header to toggle verbose reasoning logs
 
 🔧 Advanced Commands:
   Type /commands to see all available commands
@@ -490,6 +718,13 @@ Ready to build something amazing? Just describe it! ✨`;
   atlas clear                 Clear terminal history
   atlas help                  Show quick start guide
   /commands                   Show this commands list
+  think / thinking            Toggle thinking mode on/off
+
+🧠 Thinking Mode:
+  • Toggle with the 🧠 button in the header
+  • Or use: atlas thinking, think, or thinking command
+  • See detailed AI reasoning logs during code generation
+  • Includes: Planning, Researching, Executing, Drafting, Summary
 
 💡 Pro Tips:
   • All code generation uses real-time streaming by default
@@ -552,6 +787,21 @@ Try: npm install, git status, ls, or any shell command`;
   const executeListDirectory = async (args: string[]) => {
     try {
       const dirPath = args[0] || '.';
+
+      // Emit researching event if in think mode
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'researching',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          items: [
+            `Scanning directory: ${dirPath}`,
+            'Reading file system metadata',
+            'Filtering and sorting directory contents',
+            'Preparing file list for display'
+          ]
+        });
+      }
+
       const files = await shellExecutor.listDirectory(dirPath);
 
       if (files.length === 0) {
@@ -573,6 +823,21 @@ Try: npm install, git status, ls, or any shell command`;
 
     try {
       const filePath = args[0];
+
+      // Emit researching event if in think mode
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'researching',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          items: [
+            `Reading file: ${filePath}`,
+            'Analyzing file content and structure',
+            'Checking file size and encoding',
+            'Preparing content for display'
+          ]
+        });
+      }
+
       const content = await shellExecutor.readFile(filePath);
 
       if (content.length > 2000) {
@@ -628,6 +893,21 @@ Try: npm install, git status, ls, or any shell command`;
       const dev = args.includes('--dev') || args.includes('-D');
       const packagesToInstall = dev ? args.filter(p => p !== '--dev' && p !== '-D') : packages;
 
+      // Emit drafting event if in think mode (package installation involves modifying project files)
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'drafting',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Installing packages: ${packagesToInstall.join(', ')}`,
+          items: [
+            'Updating package.json dependencies',
+            'Installing packages via package manager',
+            'Updating lock file (package-lock.json/yarn.lock)',
+            'Tracking file modifications for editor integration'
+          ]
+        });
+      }
+
       updateCliActivity(true, `Installing packages: ${packagesToInstall.join(', ')}`, 0);
       addCommand(`install ${packages.join(' ')}`, `📦 Installing packages: ${packagesToInstall.join(', ')}...`, 'info');
 
@@ -636,6 +916,17 @@ Try: npm install, git status, ls, or any shell command`;
       if (result.success) {
         updateCliActivity(false, undefined, 100);
         const modifiedFilesList = extractFilePaths(result.output);
+
+        // Emit success in think mode
+        if (isThinkMode) {
+          emitToCLI({
+            kind: 'drafting',
+            ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            text: `Package installation completed successfully`,
+            output: `${packagesToInstall.length} packages installed`
+          });
+        }
+
         addCommand(`install ${packages.join(' ')}`, `✅ Packages installed successfully:\n${result.output}`, 'success');
 
         // Track package.json and lock file modifications
@@ -652,10 +943,32 @@ Try: npm install, git status, ls, or any shell command`;
         });
       } else {
         updateCliActivity(false);
+
+        // Emit failure in think mode
+        if (isThinkMode) {
+          emitToCLI({
+            kind: 'drafting',
+            ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            text: `Package installation failed`,
+            output: `Failed to install: ${packagesToInstall.join(', ')}`
+          });
+        }
+
         addCommand(`install ${packages.join(' ')}`, `❌ Package installation failed:\n${result.error || result.output}`, 'error');
       }
     } catch (error: any) {
       updateCliActivity(false);
+
+      // Emit error in think mode
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'drafting',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Package installation error: ${error.message}`,
+          output: 'Installation process could not be completed'
+        });
+      }
+
       addCommand(`install ${args.join(' ')}`, `❌ Failed to install packages: ${error.message}`, 'error');
     }
   };
@@ -708,6 +1021,22 @@ Try: npm install, git status, ls, or any shell command`;
 
     try {
       const command = args.join(' ');
+
+      // Emit executing event if in think mode
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'executing',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Executing shell command: ${command}`,
+          items: [
+            'Preparing shell environment',
+            'Validating command syntax',
+            'Setting up execution context',
+            'Monitoring for file system changes'
+          ]
+        });
+      }
+
       updateCliActivity(true, `Executing: ${command}`, 0);
       addCommand(`shell ${command}`, `🔧 Executing: ${command}...`, 'info');
 
@@ -718,6 +1047,17 @@ Try: npm install, git status, ls, or any shell command`;
 
       if (result.success) {
         updateCliActivity(false, undefined, 100);
+
+        // Emit success in think mode
+        if (isThinkMode) {
+          emitToCLI({
+            kind: 'executing',
+            ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            text: `Command executed successfully`,
+            output: `Exit code: 0, Execution time: ${result.executionTime}ms`
+          });
+        }
+
         addCommand(`shell ${command}`, `✅ Command completed (${result.executionTime}ms):\n${result.output}`, 'success');
 
         // Track any file modifications
@@ -726,10 +1066,32 @@ Try: npm install, git status, ls, or any shell command`;
         });
       } else {
         updateCliActivity(false);
+
+        // Emit failure in think mode
+        if (isThinkMode) {
+          emitToCLI({
+            kind: 'executing',
+            ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            text: `Command execution failed`,
+            output: `Exit code: ${result.exitCode || 1}, Execution time: ${result.executionTime}ms`
+          });
+        }
+
         addCommand(`shell ${command}`, `❌ Command failed (${result.executionTime}ms):\n${result.error || result.output}`, 'error');
       }
     } catch (error: any) {
       updateCliActivity(false);
+
+      // Emit error in think mode
+      if (isThinkMode) {
+        emitToCLI({
+          kind: 'executing',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Shell execution failed: ${error.message}`,
+          output: 'Command could not be executed'
+        });
+      }
+
       addCommand(`shell ${args.join(' ')}`, `❌ Shell execution failed: ${error.message}`, 'error');
     }
   };
@@ -817,12 +1179,31 @@ Try: npm install, git status, ls, or any shell command`;
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <span>{commands.length} commands</span>
-          <span>•</span>
-          <span>{modifiedFiles.size} files modified</span>
-          <span>•</span>
-          <span>{cliActivity.isActive ? 'Executing...' : 'Ready'}</span>
+        <div className="flex items-center gap-3">
+          {/* Thinking Mode Toggle */}
+          <button
+            onClick={toggleThinkingMode}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${
+              isThinkMode
+                ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-400/30'
+                : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700 border border-gray-600/30'
+            }`}
+            title={isThinkMode ? 'Click to disable thinking mode' : 'Click to enable thinking mode'}
+          >
+            <span className="text-base">{isThinkMode ? '🧠' : '💭'}</span>
+            <span>Thinking Mode</span>
+            <span className={`text-xs ${isThinkMode ? 'text-purple-400' : 'text-gray-500'}`}>
+              {isThinkMode ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span>{commands.length} commands</span>
+            <span>•</span>
+            <span>{modifiedFiles.size} files modified</span>
+            <span>•</span>
+            <span>{cliActivity.isActive ? 'Executing...' : 'Ready'}</span>
+          </div>
         </div>
       </div>
 

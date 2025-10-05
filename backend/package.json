@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon --watch 'src/**/*.ts' --exec npx ts-node src/index.ts",
+    "cli": "npx ts-node src/index.ts",
     "build": "tsc",
     "test": "jest"
   },

@@ -297,7 +297,19 @@ export default function StreamingEditor({
               eventCount++;
               console.log(`Event ${eventCount}:`, data);
 
-              if (data.type === 'FILE_OPEN') {
+              if (data.type === 'THINKING') {
+                // Forward thinking events to AtlasCLI if available
+                console.log('Thinking event:', data.kind, data);
+                if ((window as any).handleThinkingEvent) {
+                  (window as any).handleThinkingEvent({
+                    kind: data.kind,
+                    ts: data.ts,
+                    items: data.items,
+                    text: data.text,
+                    output: data.output
+                  });
+                }
+              } else if (data.type === 'FILE_OPEN') {
                 currentPath = data.path;
                 console.log('Opening file:', currentPath);
                 openTab(currentPath);

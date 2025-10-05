@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[Stream API] Generating code with backend API', { prompt: prompt.substring(0, 50), model, provider });
 
-    // Call backend API to generate code
+    // Call backend API to generate code with streaming enabled
     let backendResponse: Response;
     try {
       backendResponse = await fetch(`${BACKEND_URL}/llm/generate`, {
@@ -295,7 +295,8 @@ export async function POST(request: NextRequest) {
           prompt,
           model,
           activeProvider: provider,
-          routingMode: routingMode || 'single-model'
+          routingMode: routingMode || 'single-model',
+          streaming: true  // Enable thinking mode streaming
         }),
         // Increase timeout to 60 seconds for AI generation
         signal: AbortSignal.timeout(60000)
@@ -331,6 +332,141 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if response is streaming (SSE)
+    const contentType = backendResponse.headers.get('content-type');
+    if (contentType?.includes('text/event-stream')) {
+      // Backend is streaming - pass through thinking events and parse final code
+      console.log('[Stream API] Backend is streaming, processing events...');
+
+      let generatedCode = '';
+      let completeData: any = null;
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            const reader = backendResponse.body?.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            if (!reader) {
+              throw new Error('No reader available');
+            }
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+
+              // Process complete lines
+              for (let i = 0; i < lines.length - 1; i++) {
+                const line = lines[i].trim();
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+
+                    // Forward THINKING events directly
+                    if (data.type === 'THINKING') {
+                      console.log('[Frontend Proxy] Forwarding THINKING event:', data);
+                      controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
+                    }
+                    // Store COMPLETE event data
+                    else if (data.type === 'COMPLETE') {
+                      completeData = data;
+                      generatedCode = data.code || '';
+                    }
+                    // Forward ERROR events
+                    else if (data.type === 'ERROR') {
+                      controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
+                      controller.close();
+                      return;
+                    }
+                  } catch (e) {
+                    console.warn('[Stream API] Failed to parse SSE line:', line);
+                  }
+                }
+              }
+
+              // Keep incomplete line in buffer
+              buffer = lines[lines.length - 1];
+            }
+
+            if (!generatedCode || !completeData) {
+              throw new Error('No code generated from backend stream');
+            }
+
+            console.log('[Stream API] Code generated successfully, length:', generatedCode.length);
+
+            // Parse the generated code to create file structure
+            const files = await parseGeneratedCodeIntoFiles(generatedCode, prompt);
+
+            // Format all files with Prettier
+            const formattedFiles = await Promise.all(
+              files.map(async (file) => ({
+                ...file,
+                content: await formatContent(file.content, file.path)
+              }))
+            );
+
+            console.log('[Stream API] Created', formattedFiles.length, 'files for streaming');
+
+            // Stream the files to the client
+            for (const file of formattedFiles) {
+              // Send FILE_OPEN event
+              controller.enqueue('data: ' + JSON.stringify({ type: 'FILE_OPEN', path: file.path }) + '\n\n');
+
+              // Split content into lines and stream them
+              const lines = file.content.split('\n');
+              for (let i = 0; i < lines.length; i++) {
+                const isLastLine = i === lines.length - 1;
+                const line = lines[i];
+
+                // Skip empty last lines
+                if (isLastLine && line === '') continue;
+
+                const chunk = isLastLine ? line : line + '\n';
+
+                // Send APPEND event
+                controller.enqueue('data: ' + JSON.stringify({ type: 'APPEND', text: chunk }) + '\n\n');
+
+                // Add realistic delay for streaming effect
+                await new Promise(resolve => setTimeout(resolve, Math.random() * 50 + 25));
+              }
+
+              // Send FILE_CLOSE event
+              controller.enqueue('data: ' + JSON.stringify({ type: 'FILE_CLOSE', path: file.path }) + '\n\n');
+
+              // Delay between files
+              await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            // Send COMPLETE event with metadata
+            controller.enqueue('data: ' + JSON.stringify({
+              type: 'COMPLETE',
+              metadata: completeData.metadata,
+              budget: completeData.budget
+            }) + '\n\n');
+
+          } catch (error: any) {
+            console.error('[Stream API] Error during streaming:', error);
+            controller.enqueue('data: ' + JSON.stringify({ type: 'ERROR', message: error?.message || 'Unknown error' }) + '\n\n');
+          } finally {
+            controller.close();
+          }
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive'
+        }
+      });
+    }
+
+    // Fallback: non-streaming response
     const result = await backendResponse.json();
     const generatedCode = result.code;
 
@@ -338,7 +474,7 @@ export async function POST(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'No code generated' }), { status: 500 });
     }
 
-    console.log('[Stream API] Code generated successfully, length:', generatedCode.length);
+    console.log('[Stream API] Code generated successfully (non-streaming), length:', generatedCode.length);
 
     // Parse the generated code to create file structure
     const files = await parseGeneratedCodeIntoFiles(generatedCode, prompt);

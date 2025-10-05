@@ -48,21 +48,52 @@ const validateGenerateRequest = [
   body('allowFailover').optional().isBoolean().withMessage('Allow failover must be a boolean.'),
 ];
 
+// Helper function to emit thinking events
+const emitThinkingEvent = (res: Response, event: {
+  kind: 'planning' | 'researching' | 'executing' | 'drafting' | 'user' | 'summary';
+  ts: string;
+  items?: string[];
+  text?: string;
+  output?: string;
+}) => {
+  const thinkingEvent = { type: 'THINKING', ...event };
+  console.log('[THINKING EVENT]', thinkingEvent);
+  res.write(`data: ${JSON.stringify(thinkingEvent)}\n\n`);
+};
+
 router.post('/generate', validateGenerateRequest, async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { prompt, model, routingMode, capabilities, priority, maxCost, activeProvider, allowFailover } = req.body;
+  const { prompt, model, routingMode, capabilities, priority, maxCost, activeProvider, allowFailover, streaming } = req.body;
+
+  // Set up streaming if requested
+  const useStreaming = streaming !== false; // Default to true
+  if (useStreaming) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+  }
 
   try {
     console.log('[/llm/generate] request received', {
       routingMode,
       model,
       activeProvider,
-      promptLength: typeof prompt === 'string' ? prompt.length : 0
+      promptLength: typeof prompt === 'string' ? prompt.length : 0,
+      streaming: useStreaming
     });
+
+    // Emit user event
+    if (useStreaming) {
+      emitThinkingEvent(res, {
+        kind: 'user',
+        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        text: `Prompt: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`
+      });
+    }
     let targetModel = 'gpt-4o';
     let targetProvider = 'openai';
 
@@ -101,9 +132,31 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
 
     console.log('[/llm/generate] resolved target', { targetProvider, targetModel });
 
+    // Emit planning event
+    if (useStreaming) {
+      emitThinkingEvent(res, {
+        kind: 'planning',
+        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        items: [
+          'Analyzing prompt requirements and context',
+          `Selecting AI provider: ${targetProvider}`,
+          `Choosing model: ${targetModel}`,
+          'Preparing code generation strategy'
+        ]
+      });
+    }
+
     // Validate provider configuration
     const providerConfigured = providerManager.isProviderConfigured(targetProvider);
     if (!providerConfigured) {
+      if (useStreaming) {
+        res.write(`data: ${JSON.stringify({
+          type: 'ERROR',
+          error: 'Provider not configured',
+          provider: targetProvider
+        })}\n\n`);
+        return res.end();
+      }
       return res.status(422).json({
         error: 'Provider not configured',
         provider: targetProvider,
@@ -140,14 +193,53 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
       });
     }
 
+    // Emit researching event
+    if (useStreaming) {
+      emitThinkingEvent(res, {
+        kind: 'researching',
+        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        items: [
+          'Checking API availability and authentication',
+          'Validating model configuration',
+          'Preparing request payload',
+          'Setting up response stream'
+        ]
+      });
+    }
+
     // Generate code using the selected provider and model
     let result;
     let isMock = false;
     let errorMessage: string | undefined;
     try {
       console.log('[/llm/generate] calling providerManager.generateCode');
+
+      // Emit executing event
+      if (useStreaming) {
+        emitThinkingEvent(res, {
+          kind: 'executing',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: `Generating code with ${targetProvider} ${targetModel}`,
+          items: [
+            'Sending request to AI provider',
+            'Processing AI response',
+            'Formatting generated code'
+          ]
+        });
+      }
+
       result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig);
       console.log('[/llm/generate] provider call succeeded');
+
+      // Emit drafting event
+      if (useStreaming) {
+        emitThinkingEvent(res, {
+          kind: 'drafting',
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: 'Code generation completed',
+          output: `Generated ${result.length} characters`
+        });
+      }
     } catch (error) {
       console.log('[/llm/generate] provider call failed, using mock response for demo', error instanceof Error ? error.message : String(error));
       isMock = true;
@@ -246,8 +338,18 @@ console.log("Hello from AI-generated code!");`;
     modelRegistry.recordUsage(targetProvider, targetModel, estimatedTokens, 0, estimatedCost);
     const newAlerts = budgetManager.recordUsage(targetProvider, targetModel, estimatedTokens, 0, estimatedCost);
 
+    // Emit summary event
+    if (useStreaming) {
+      emitThinkingEvent(res, {
+        kind: 'summary',
+        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        text: 'Code generation completed successfully',
+        output: `Model: ${targetModel} | Tokens: ${estimatedTokens} | Cost: $${estimatedCost.toFixed(4)}`
+      });
+    }
+
     // Return result with metadata
-    res.json({
+    const responseData = {
       code: result,
       metadata: {
         model: targetModel,
@@ -266,13 +368,30 @@ console.log("Hello from AI-generated code!");`;
           monthly: budgetManager.getBudgetStatus('monthly')
         }
       }
-    });
+    };
+
+    if (useStreaming) {
+      // Send final data and close stream
+      res.write(`data: ${JSON.stringify({ type: 'COMPLETE', ...responseData })}\n\n`);
+      res.end();
+    } else {
+      res.json(responseData);
+    }
   } catch (error) {
     console.error('LLM generation error:', error);
-    res.status(500).json({
-      error: 'Failed to generate code',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    if (useStreaming) {
+      res.write(`data: ${JSON.stringify({
+        type: 'ERROR',
+        error: 'Failed to generate code',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({
+        error: 'Failed to generate code',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 });
 
