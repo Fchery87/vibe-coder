@@ -655,6 +655,17 @@ export default function Home() {
     setActiveView('editor');
   };
 
+  // Expose function to switch to editor view globally for Atlas CLI
+  useEffect(() => {
+    (window as any).switchToEditorView = () => {
+      setActiveView('editor');
+    };
+
+    return () => {
+      delete (window as any).switchToEditorView;
+    };
+  }, []);
+
   // Atlas CLI Event Listeners
   useEffect(() => {
     const handleAtlasExport = (event: any) => {
@@ -1115,6 +1126,16 @@ export default function Home() {
 
             {/* Editor/Sandbox Column */}
             <div className="flex flex-col min-h-0 xl:border-l border-slate-700/50">
+              {/* Hidden StreamingEditor to keep functions exposed globally */}
+              <div style={{ display: 'none' }}>
+                <StreamingEditor
+                  onStreamingComplete={handleStreamingComplete}
+                  onStreamingError={handleStreamingError}
+                  onFileModified={handleCliFileModified}
+                  onExitStreaming={() => setIsStreamingMode(false)}
+                />
+              </div>
+
               <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'editor' | 'sandbox')} className="flex-1 flex flex-col min-h-0">
                 {/* Header with Tabs */}
                 <div className="p-3 md:p-4 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
@@ -1187,14 +1208,16 @@ export default function Home() {
 
                 {/* Editor Tab Content */}
                 <TabsContent value="editor" className="flex-1 min-h-0 m-0">
-                  {isStreamingMode ? (
+                  {/* Always render StreamingEditor to keep function exposed, but hide when not in use */}
+                  <div style={{ display: isStreamingMode ? 'flex' : 'none', flex: 1, minHeight: 0 }}>
                     <StreamingEditor
                       onStreamingComplete={handleStreamingComplete}
                       onStreamingError={handleStreamingError}
                       onFileModified={handleCliFileModified}
                       onExitStreaming={() => setIsStreamingMode(false)}
                     />
-                  ) : (
+                  </div>
+                  {!isStreamingMode && (
                     <CodeEditor
                       value={isGenerating && !generatedCode ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!" : generatedCode}
                       onChange={(val) => val !== undefined && setGeneratedCode(val)}

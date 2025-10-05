@@ -267,11 +267,29 @@ Ready to build something amazing? Just describe it! ✨`,
         // If command doesn't match any specific atlas subcommand, treat as direct prompt
         if (cmd.length > 2 && !cmd.startsWith('/')) {
           // Always use streaming mode for prompts
+          console.log('[Atlas CLI] Checking for streaming function:', typeof (window as any).startStreamingSession);
+          console.log('[Atlas CLI] Checking for view switch function:', typeof (window as any).switchToEditorView);
+
           if ((window as any).startStreamingSession) {
-            console.log('Starting streaming session with prompt:', cmd);
-            (window as any).startStreamingSession(cmd);
+            console.log('[Atlas CLI] Starting streaming session with prompt:', cmd);
+            // Switch to editor view before starting streaming
+            if ((window as any).switchToEditorView) {
+              (window as any).switchToEditorView();
+              console.log('[Atlas CLI] Switched to editor view');
+            }
+            // Small delay to ensure editor is rendered
+            setTimeout(() => {
+              console.log('[Atlas CLI] Calling startStreamingSession after delay');
+              if ((window as any).startStreamingSession) {
+                (window as any).startStreamingSession(cmd);
+                console.log('[Atlas CLI] startStreamingSession called successfully');
+              } else {
+                console.error('[Atlas CLI] startStreamingSession not available after delay!');
+              }
+            }, 100);
             addCommand(cmd, '🚀 Generating code with real-time streaming...', 'info');
           } else {
+            console.log('[Atlas CLI] Streaming not available, using fallback');
             // Fallback to regular generation if streaming not available
             await onCommand(cmd);
           }
@@ -302,7 +320,14 @@ Ready to build something amazing? Just describe it! ✨`,
         // Always use streaming for generate
         if ((window as any).startStreamingSession) {
           console.log('Starting streaming session with prompt:', prompt);
-          (window as any).startStreamingSession(prompt);
+          // Switch to editor view before starting streaming
+          if ((window as any).switchToEditorView) {
+            (window as any).switchToEditorView();
+          }
+          // Small delay to ensure editor is rendered
+          setTimeout(() => {
+            (window as any).startStreamingSession(prompt);
+          }, 100);
           addCommand(`atlas generate "${prompt}"`, '🚀 Generating code with real-time streaming...', 'info');
         } else {
           await onCommand(prompt);
