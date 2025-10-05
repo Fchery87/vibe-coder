@@ -403,26 +403,31 @@ export default function StreamingEditor({
     <div className="streaming-editor h-full flex flex-col">
       {/* Tab Bar */}
       {files.length > 0 && (
-        <div className="flex border-b border-slate-700/50 bg-slate-800/30 flex-shrink-0">
-          {files.map(file => (
-            <div
-              key={file.path}
-              className={`px-3 py-2 text-sm cursor-pointer border-r border-slate-700/50 flex items-center gap-2 ${
-                activeFile === file.path
-                  ? 'bg-slate-700/50 text-white border-b-2 border-blue-400'
-                  : 'text-gray-300 hover:text-white hover:bg-slate-700/30'
-              }`}
-              onClick={() => setActive(file.path)}
-            >
-              <span className="truncate max-w-32">{file.path.split('/').pop()}</span>
-              {file.status === 'writing' && (
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-              )}
-              {file.status === 'done' && (
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              )}
-            </div>
-          ))}
+        <div className="relative border-b border-slate-700/50 bg-slate-800/30 flex-shrink-0">
+          <div className="flex overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+            {files.map(file => (
+              <div
+                key={file.path}
+                className={`px-3 py-2 text-sm cursor-pointer border-r border-slate-700/50 flex items-center gap-2 whitespace-nowrap flex-shrink-0 ${
+                  activeFile === file.path
+                    ? 'bg-slate-700/50 text-white border-b-2 border-blue-400'
+                    : 'text-gray-300 hover:text-white hover:bg-slate-700/30'
+                }`}
+                onClick={() => setActive(file.path)}
+              >
+                <span className="truncate max-w-40">{file.path.split('/').pop()}</span>
+                {file.status === 'writing' && (
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+                )}
+                {file.status === 'done' && (
+                  <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+                )}
+              </div>
+            ))}
+          </div>
+          {files.length > 5 && (
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-800 to-transparent pointer-events-none"></div>
+          )}
         </div>
       )}
 
@@ -490,13 +495,12 @@ export default function StreamingEditor({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-lg mb-2">Ready for Streaming Code Generation</p>
-              <p className="text-sm mb-2">Use Atlas CLI:</p>
-              <div className="bg-slate-800 p-3 rounded text-left font-mono text-sm">
-                <div className="text-green-400">$ atlas stream "Create a React todo app"</div>
-                <div className="text-gray-400 mt-1">or</div>
-                <div className="text-green-400">$ stream "Build a ping pong game"</div>
-              </div>
+              <p className="text-xl font-semibold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Your Canvas Awaits
+              </p>
+              <p className="text-sm text-gray-400 max-w-md mx-auto">
+                Where brilliant ideas transform into beautiful code, one keystroke at a time ✨
+              </p>
             </div>
           </div>
         )}

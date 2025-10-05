@@ -184,3 +184,6 @@ NOTES.md
 # Generated files
 generated/
 auto-generated/
+
+# YoYo AI version control directory
+.yoyo/

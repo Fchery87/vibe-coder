@@ -48,11 +48,9 @@ export default function Home() {
     devServerUrl?: string;
     error?: string;
   } | null>(null);
-  const [routingMode, setRoutingMode] = useState<string>('single-model');
-  const [activeProvider, setActiveProvider] = useState<string>('ollama');
-  const [selectedModel, setSelectedModel] = useState<string>('codellama');
+  const [activeProvider, setActiveProvider] = useState<string>('google');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash-lite');
   const [allowFailover, setAllowFailover] = useState<boolean>(false);
-  const [singleModelMode, setSingleModelMode] = useState<boolean>(true);
   const [isRunningQualityCheck, setIsRunningQualityCheck] = useState(false);
   const [qualityReport, setQualityReport] = useState<{
     lint: any;
@@ -91,6 +89,31 @@ export default function Home() {
   const [isStreamingMode, setIsStreamingMode] = useState(true);
   const [streamingFiles, setStreamingFiles] = useState<Array<{ path: string; status: string; content: string }>>([]);
 
+  // Load provider and model from localStorage on mount
+  useEffect(() => {
+    const savedProvider = localStorage.getItem('activeProvider');
+    const savedModel = localStorage.getItem('selectedModel');
+
+    if (savedProvider) {
+      setActiveProvider(savedProvider);
+    }
+    if (savedModel) {
+      setSelectedModel(savedModel);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeProvider) {
+      localStorage.setItem('activeProvider', activeProvider);
+    }
+  }, [activeProvider]);
+
+  useEffect(() => {
+    if (selectedModel) {
+      localStorage.setItem('selectedModel', selectedModel);
+    }
+  }, [selectedModel]);
+
   const handleGenerate = async (prompt: string) => {
     const startTime = new Date();
     setIsGenerating(true);
@@ -111,28 +134,24 @@ export default function Home() {
     // Add initial log
     setSandboxLogs(prev => [...prev, {
       type: 'info',
-      message: `🚀 Starting code generation with ${activeProvider || 'orchestrated'} model...`,
+      message: `🚀 Starting code generation with ${activeProvider || 'openai'} model...`,
       timestamp: new Date()
     }]);
 
     try {
-      const requestBody: any = { prompt, routingMode };
+      // Always use single-model mode with selected provider
+      const requestBody: any = {
+        prompt,
+        routingMode: 'single-model',
+        activeProvider: activeProvider || 'openai',
+        allowFailover: allowFailover
+      };
 
-      // If user enabled single-model mode and selected a provider, honor it.
-      // Also, when provider is xai, default model to grok-code-fast-1 unless overridden.
-      if (singleModelMode && activeProvider) {
-        requestBody.activeProvider = activeProvider;
-        requestBody.allowFailover = allowFailover;
-        if (selectedModel) {
-          requestBody.model = `${activeProvider}:${selectedModel}`;
-        } else if (activeProvider.toLowerCase() === 'xai' && !requestBody.model) {
-          requestBody.model = 'xai:grok-4-fast-reasoning';
-        }
-      }
-
-      // If not using single-model mode but routingMode is manual, default to xAI fast coder for testing
-      if (!singleModelMode && routingMode === 'manual' && !requestBody.model && activeProvider && selectedModel) {
+      // Add model if selected
+      if (selectedModel) {
         requestBody.model = `${activeProvider}:${selectedModel}`;
+      } else if (activeProvider?.toLowerCase() === 'xai') {
+        requestBody.model = 'xai:grok-4-fast-reasoning';
       }
 
       setSandboxLogs(prev => [...prev, {
@@ -781,32 +800,8 @@ export default function Home() {
               </div>
             )}
 
-            {/* Routing Mode Selector */}
-            <div className="hidden sm:flex items-center gap-2">
-              <span className="text-xs text-gray-400">Mode:</span>
-              <select
-                value={routingMode}
-                onChange={(e) => {
-                  setRoutingMode(e.target.value);
-                  if (e.target.value === 'single-model') {
-                    setSingleModelMode(true);
-                  } else {
-                    setSingleModelMode(false);
-                  }
-                }}
-                className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
-              >
-                <option value="orchestrated">Orchestrated</option>
-                <option value="heuristic">Heuristic</option>
-                <option value="cost-aware">Cost-Aware</option>
-                <option value="manual">Manual</option>
-                <option value="single-model">Single-Model</option>
-              </select>
-            </div>
-
-            {/* Single-Model Mode Controls */}
-            {singleModelMode && (
-              <div className="hidden md:flex items-center gap-2">
+            {/* Provider Selector (always visible - single-model mode only) */}
+            <div className="hidden md:flex items-center gap-2">
                 <span className="text-xs text-gray-400">Provider:</span>
                 <select
                   value={activeProvider}
@@ -895,7 +890,6 @@ export default function Home() {
                   </span>
                 )}
               </div>
-            )}
 
             {/* Checkpoint and Export Controls */}
             <div className="hidden md:flex items-center gap-1 lg:gap-2">

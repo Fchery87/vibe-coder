@@ -210,12 +210,12 @@ export class PromptGraphExecutor {
     const startTime = Date.now();
 
     try {
-      // Select appropriate model for this node type
+      // Select model using single-model routing
+      // (Note: Orchestrated mode has been simplified - now uses user-selected provider)
       const routingContext: RoutingContext = {
-        mode: 'orchestrated',
-        capabilities: this.getCapabilitiesForNodeType(node.type),
-        priority: this.getPriorityForNodeType(node.type),
-        nodeType: node.type
+        mode: 'single-model',
+        activeProvider: 'openai', // Default provider for graph execution
+        allowFailover: true
       };
 
       const decision = await this.routingService.makeRoutingDecision(routingContext);

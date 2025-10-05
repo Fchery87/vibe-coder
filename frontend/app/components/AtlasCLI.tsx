@@ -83,13 +83,13 @@ Ready to build something amazing? Just describe it! ✨`,
     progress?: number;
   }>({ isActive: false });
   const [isThinkMode, setIsThinkMode] = useState(() => {
-    // Load thinking mode preference from localStorage
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('atlasThinkingMode');
-      return saved ? JSON.parse(saved) : true; // Default to enabled
+      return saved ? JSON.parse(saved) : true;
     }
     return true;
   });
+  const isThinkModeRef = useRef(isThinkMode); // Track current thinking mode state
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const shellExecutor = ShellExecutor.getInstance();
@@ -101,10 +101,16 @@ Ready to build something amazing? Just describe it! ✨`,
     }
   }, [commands]);
 
+  // Update ref whenever isThinkMode changes
+  useEffect(() => {
+    isThinkModeRef.current = isThinkMode;
+  }, [isThinkMode]);
+
   // Toggle thinking mode
   const toggleThinkingMode = () => {
     const newMode = !isThinkMode;
     setIsThinkMode(newMode);
+    isThinkModeRef.current = newMode;
     localStorage.setItem('atlasThinkingMode', JSON.stringify(newMode));
 
     addCommand(
@@ -118,58 +124,47 @@ Ready to build something amazing? Just describe it! ✨`,
 
   // Emit function for structured thinking mode logging
   const emitToCLI = ({ kind, ts, items, text, output }: ThinkEvent) => {
-    // Skip if thinking mode is disabled
-    if (!isThinkMode) {
+    if (!isThinkModeRef.current) {
       console.log(`[Thinking Mode OFF] Skipping ${kind} event`);
       return;
     }
 
-    const timestamp = ts || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    let formattedOutput = '';
-
-    // Color coding for different event types (matching Atlas specification)
-    const colors = {
-      planning: '\x1b[35m',    // magenta
-      researching: '\x1b[36m', // cyan
-      executing: '\x1b[32m',   // green
-      drafting: '\x1b[33m',    // yellow
-      user: '\x1b[34m',        // blue
-      summary: '\x1b[37m'      // white
-    };
-
-    const color = colors[kind] || '\x1b[37m';
-    const reset = '\x1b[0m';
+    const timestamp = ts || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     const kindLabel = kind.charAt(0).toUpperCase() + kind.slice(1);
 
-    // Format with Atlas-style output
-    formattedOutput += `${color}[${kindLabel}]${reset} ${timestamp}\n`;
+    let formattedOutput = `${kindLabel}
+${timestamp}
+`;
 
-    if (items?.length) {
-      items.forEach(item => formattedOutput += `  • ${item}\n`);
-    }
+    const appendLine = (rawLine: string) => {
+      const trimmed = rawLine.trim();
+      if (!trimmed) return;
+      const bullet = /^(?:\d+\.|[-*])\s+/.test(trimmed) ? trimmed : `- ${trimmed}`;
+      formattedOutput += `${bullet}
+`;
+    };
 
-    if (text) {
-      formattedOutput += `  ${text}\n`;
+    items?.forEach(item => appendLine(item));
+
+    if (text && text.trim()) {
+      appendLine(text);
     }
 
     if (output) {
-      formattedOutput += `\n${output}\n`;
+      output.split('\n').forEach(line => appendLine(line));
     }
 
-    formattedOutput += '\n';
+    formattedOutput = formattedOutput.trimEnd();
 
-    // Add to CLI display as a special thinking command
     const thinkingCommand: CLICommand = {
       id: `thinking-${kind}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      command: `[${kindLabel}]`,
-      output: formattedOutput.trim(),
+      command: kindLabel,
+      output: formattedOutput,
       timestamp: new Date(),
       type: 'info'
     };
 
     setCommands(prev => [...prev, thinkingCommand]);
-
-    // Also log to console for debugging
     console.log(`[${timestamp}] ${kindLabel}:`, { items, text, output });
   };
 
@@ -243,42 +238,16 @@ Ready to build something amazing? Just describe it! ✨`,
   // Update commands when external state changes
   useEffect(() => {
     if (isGenerating) {
-      // Auto-enable thinking mode when code generation starts
-      setIsThinkMode(true);
-
-      // Emit planning event for code generation
-      emitToCLI({
-        kind: 'planning',
-        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        items: [
-          'Analyzing prompt requirements and context',
-          'Selecting appropriate AI provider and model',
-          'Planning code structure and implementation approach',
-          'Preparing real-time streaming environment'
-        ]
-      });
-
+      // Keep thinking mode enabled (don't force it on, respect user's choice)
+      // Backend will emit all planning/researching/executing events via streaming API
       addCommand('atlas generate "..."', '🤖 Atlas is generating code...', 'info');
     }
   }, [isGenerating]);
 
   useEffect(() => {
     if (generatedCode && !isGenerating) {
-      // Emit summary when code generation completes
-      if (isThinkMode) {
-        emitToCLI({
-          kind: 'summary',
-          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          text: 'Code generation completed successfully',
-          output: `Generated ${generatedCode.length} characters of code`
-        });
-
-        // Reset thinking mode after completion
-        setTimeout(() => {
-          setIsThinkMode(false);
-        }, 2000); // Small delay to show the summary
-      }
-
+      // Backend will emit summary via streaming - no need to duplicate
+      // Just show success message
       addCommand('atlas generate "..."', `✅ Code generated successfully (${generatedCode.length} characters)`, 'success');
     }
   }, [generatedCode, isGenerating]);
@@ -329,21 +298,7 @@ Ready to build something amazing? Just describe it! ✨`,
     setIsExecuting(true);
 
     try {
-      // Emit planning event if in think mode
-      if (isThinkMode) {
-        const planningSteps = [
-          'Parsing command structure and arguments',
-          'Identifying command type and validation requirements',
-          'Preparing execution environment and dependencies',
-          'Setting up error handling and logging'
-        ];
-        emitToCLI({
-          kind: 'planning',
-          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          items: planningSteps
-        });
-      }
-
+      // Backend will emit planning events via streaming API - no need to duplicate here
       // Parse and execute command
       await parseAndExecuteCommand(cmd);
     } catch (error: any) {
@@ -382,7 +337,7 @@ Ready to build something amazing? Just describe it! ✨`,
     const baseCommand = parts[0];
     const args = parts.slice(1);
 
-    // Check for --think flag
+    // Check for --think flag (optional override, but don't auto-disable)
     const thinkIndex = args.findIndex(arg => arg === '--think');
     const hasThinkFlag = thinkIndex !== -1;
 
@@ -390,9 +345,8 @@ Ready to build something amazing? Just describe it! ✨`,
       setIsThinkMode(true);
       // Remove --think from args for processing
       args.splice(thinkIndex, 1);
-    } else {
-      setIsThinkMode(false);
     }
+    // Don't auto-disable thinking mode - let user control via toggle button
 
     console.log('[Atlas CLI] Parsing command:', { cmd, baseCommand, args, thinkMode: hasThinkFlag });
 

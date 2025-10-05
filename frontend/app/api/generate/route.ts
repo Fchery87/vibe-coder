@@ -427,8 +427,8 @@ export async function POST(request: NextRequest) {
 
                 const chunk = isLastLine ? line : line + '\n';
 
-                // Send APPEND event
-                controller.enqueue('data: ' + JSON.stringify({ type: 'APPEND', text: chunk }) + '\n\n');
+                // Send APPEND event with path so StreamingEditor knows which file to append to
+                controller.enqueue('data: ' + JSON.stringify({ type: 'APPEND', path: file.path, text: chunk }) + '\n\n');
 
                 // Add realistic delay for streaming effect
                 await new Promise(resolve => setTimeout(resolve, Math.random() * 50 + 25));
@@ -508,8 +508,8 @@ export async function POST(request: NextRequest) {
 
               const chunk = isLastLine ? line : line + '\n';
 
-              // Send APPEND event
-              controller.enqueue('data: ' + JSON.stringify({ type: 'APPEND', text: chunk }) + '\n\n');
+              // Send APPEND event with path so StreamingEditor knows which file to append to
+              controller.enqueue('data: ' + JSON.stringify({ type: 'APPEND', path: file.path, text: chunk }) + '\n\n');
 
               // Add realistic delay for streaming effect
               await new Promise(resolve => setTimeout(resolve, Math.random() * 50 + 25));
@@ -608,6 +608,89 @@ async function parseGeneratedCodeIntoFiles(
   code: string,
   prompt: string
 ): Promise<Array<{ path: string; content: string }>> {
+  // First, try to extract code from markdown code blocks
+  const markdownCodeBlockRegex = /```(\w+)?\s*\n([\s\S]*?)```/g;
+  const codeBlocks = Array.from(code.matchAll(markdownCodeBlockRegex));
+
+  if (codeBlocks.length > 0) {
+    console.log('[parseGeneratedCode] Found', codeBlocks.length, 'markdown code blocks');
+    const files: Array<{ path: string; content: string }> = [];
+
+    // Look for file path indicators before code blocks
+    const lines = code.split('\n');
+
+    for (let i = 0; i < codeBlocks.length; i++) {
+      const block = codeBlocks[i];
+      const language = block[1] || 'txt';
+      const content = block[2].trim();
+
+      console.log('[parseGeneratedCode] Block', i, '- Language:', language, 'Content length:', content.length);
+
+      // Skip empty blocks
+      if (!content) {
+        console.log('[parseGeneratedCode] Skipping empty block', i);
+        continue;
+      }
+
+      // Try to find a file path in the lines before this code block
+      const blockIndex = code.indexOf(block[0]);
+      const textBefore = code.substring(0, blockIndex);
+      const linesBefore = textBefore.split('\n').slice(-10); // Look at last 10 lines for more context
+
+      let filePath = '';
+
+      // Look for patterns like "**1. `config.py`**" or "### app/models.py" or just "`filename.ext`"
+      for (const line of linesBefore.reverse()) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Pattern 1: Filename in backticks with optional numbering/formatting
+        // Examples: `config.py`, **1. `config.py`**, ### `app.js`
+        let pathMatch = trimmed.match(/[`*#]*\s*(?:\d+[\.\)]\s*)?[`'"]*([a-zA-Z0-9_\-\/\.]+\.[a-zA-Z0-9]+)[`'"]*\s*[`*#]*/i);
+
+        // Pattern 2: Markdown heading with filename
+        // Examples: ## config.py, ### Create app/models.py
+        if (!pathMatch) {
+          pathMatch = trimmed.match(/^#{1,6}\s+(?:Create\s+|File:\s+)?([a-zA-Z0-9_\-\/\.]+\.[a-zA-Z0-9]+)/i);
+        }
+
+        // Pattern 3: "File:" or "Filename:" prefix
+        // Examples: File: config.py, Filename: app.js
+        if (!pathMatch) {
+          pathMatch = trimmed.match(/^(?:File|Filename|Create|Add):\s*[`'"]*([a-zA-Z0-9_\-\/\.]+\.[a-zA-Z0-9]+)/i);
+        }
+
+        // Pattern 4: Plain filename at start of line (with numbering)
+        // Examples: 1. config.py, 2) app.js
+        if (!pathMatch) {
+          pathMatch = trimmed.match(/^\d+[\.\)]\s+([a-zA-Z0-9_\-\/\.]+\.[a-zA-Z0-9]+)/);
+        }
+
+        if (pathMatch && pathMatch[1]) {
+          filePath = pathMatch[1];
+          console.log('[parseGeneratedCode] Found file path in line:', line.trim(), '→', pathMatch[1]);
+          break;
+        }
+      }
+
+      // If no path found, generate one based on language and content
+      if (!filePath) {
+        const ext = getExtensionForLanguage(language);
+        // Try to generate a more meaningful name based on content
+        filePath = generateMeaningfulFilename(content, language, i + 1);
+        console.log('[parseGeneratedCode] No path found, generated:', filePath);
+      }
+
+      files.push({ path: filePath, content });
+      console.log('[parseGeneratedCode] Added file:', filePath, 'with', content.length, 'chars');
+    }
+
+    if (files.length > 0) {
+      console.log('[parseGeneratedCode] Extracted', files.length, 'files from markdown:', files.map(f => `${f.path} (${f.content.length} chars)`));
+      return files;
+    }
+  }
+
   // Try to detect file markers in the generated code
   const fileMarkerRegex = /^(?:\/\/|#|<!--|\/\*)\s*(?:File|Filename|Path):\s*(.+?)(?:\s*(?:-->|\*\/))?\s*$/gim;
   const matches = Array.from(code.matchAll(fileMarkerRegex));
@@ -725,4 +808,94 @@ function detectFileExtension(code: string): string {
   if (code.includes('<!DOCTYPE') || code.includes('<html')) return 'html';
   if (code.includes('function') || code.includes('const')) return 'js';
   return 'txt';
+}
+
+function getExtensionForLanguage(language: string): string {
+  const langMap: Record<string, string> = {
+    'python': 'py',
+    'javascript': 'js',
+    'typescript': 'ts',
+    'html': 'html',
+    'css': 'css',
+    'json': 'json',
+    'jsx': 'jsx',
+    'tsx': 'tsx',
+    'markdown': 'md',
+    'sql': 'sql',
+    'bash': 'sh',
+    'shell': 'sh',
+    'yaml': 'yml',
+    'yml': 'yml'
+  };
+
+  return langMap[language.toLowerCase()] || language.toLowerCase() || 'txt';
+}
+
+// Generate a meaningful filename based on content analysis
+function generateMeaningfulFilename(content: string, language: string, index: number): string {
+  const ext = getExtensionForLanguage(language);
+
+  // Try to infer filename from content patterns
+  const lines = content.split('\n').slice(0, 20); // Look at first 20 lines
+
+  // Python: Look for class or function names
+  if (language === 'python' || ext === 'py') {
+    const classMatch = content.match(/^class\s+(\w+)/m);
+    if (classMatch) return `${classMatch[1].toLowerCase()}.py`;
+
+    const funcMatch = content.match(/^def\s+(\w+)/m);
+    if (funcMatch && funcMatch[1] !== 'main') return `${funcMatch[1]}.py`;
+  }
+
+  // JavaScript/TypeScript: Look for component, class, or export names
+  if (['javascript', 'typescript', 'jsx', 'tsx'].includes(language) || ['js', 'ts', 'jsx', 'tsx'].includes(ext)) {
+    // React component
+    const componentMatch = content.match(/(?:export\s+(?:default\s+)?)?(?:function|class|const)\s+([A-Z]\w+)/);
+    if (componentMatch) {
+      const name = componentMatch[1];
+      return ext === 'jsx' || ext === 'tsx' ? `${name}.${ext}` : `${name}.js`;
+    }
+  }
+
+  // HTML: Look for title
+  if (language === 'html' || ext === 'html') {
+    const titleMatch = content.match(/<title>(.*?)<\/title>/i);
+    if (titleMatch) {
+      const title = titleMatch[1].toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+      if (title && title !== 'document') return `${title}.html`;
+    }
+    return 'index.html';
+  }
+
+  // CSS: Look for common patterns
+  if (language === 'css' || ext === 'css') {
+    if (content.includes('@keyframes') || content.includes('animation')) return 'animations.css';
+    if (content.includes('.btn') || content.includes('button')) return 'buttons.css';
+    return 'styles.css';
+  }
+
+  // SQL: Look for table names
+  if (language === 'sql' || ext === 'sql') {
+    const createMatch = content.match(/CREATE\s+TABLE\s+(\w+)/i);
+    if (createMatch) return `${createMatch[1].toLowerCase()}.sql`;
+    return 'schema.sql';
+  }
+
+  // Default: Use generic naming with index
+  const defaultNames: Record<string, string> = {
+    'py': 'script',
+    'js': 'script',
+    'ts': 'script',
+    'jsx': 'Component',
+    'tsx': 'Component',
+    'html': 'index',
+    'css': 'styles',
+    'json': 'config',
+    'md': 'README',
+    'sql': 'schema',
+    'sh': 'script'
+  };
+
+  const baseName = defaultNames[ext] || 'file';
+  return index === 1 ? `${baseName}.${ext}` : `${baseName}${index}.${ext}`;
 }

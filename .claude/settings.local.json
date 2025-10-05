@@ -6,7 +6,8 @@
       "Bash(curl -X POST http://localhost:3001/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Write a hello world function in JavaScript\"\",\"\"activeProvider\"\":\"\"openai\"\",\"\"model\"\":\"\"gpt-4o\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
       "Bash(curl -X POST http://localhost:3001/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Write a hello world function in JavaScript\"\",\"\"activeProvider\"\":\"\"anthropic\"\",\"\"model\"\":\"\"claude-3-5-sonnet-20241022\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
       "Bash(curl -X POST http://127.0.0.1:3001/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Create a simple counter component\"\",\"\"activeProvider\"\":\"\"google\"\",\"\"model\"\":\"\"gemini-2.5-flash-lite\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

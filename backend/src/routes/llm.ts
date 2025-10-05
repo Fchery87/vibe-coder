@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import { body, validationResult } from 'express-validator';
 import { ModelRegistryService } from '../services/model-registry';
 import { RoutingService, RoutingContext } from '../services/routing-service';
@@ -49,6 +51,43 @@ const validateGenerateRequest = [
 ];
 
 // Helper function to emit thinking events
+
+// Helper function to get model context window size
+const getModelContextWindow = (model: string): number => {
+  const contextWindows: Record<string, number> = {
+    'gpt-4o': 128000,
+    'gpt-4-turbo': 128000,
+    'gpt-3.5-turbo': 16385,
+    'claude-3-5-sonnet-20241022': 200000,
+    'claude-3-opus-20240229': 200000,
+    'gemini-2.5-flash-lite': 1000000,
+    'gemini-2.0-flash-exp': 1000000,
+    'grok-4-fast-reasoning': 128000,
+  };
+  return contextWindows[model] || 4096;
+};
+
+// Helper function to get provider API endpoint for display
+const getProviderAPIEndpoint = (provider: string): string => {
+  const endpoints: Record<string, string> = {
+    openai: 'https://api.openai.com/v1/chat/completions',
+    anthropic: 'https://api.anthropic.com/v1/messages',
+    google: 'https://generativelanguage.googleapis.com/v1beta/models',
+    xai: 'https://api.x.ai/v1/chat/completions',
+    supernova: 'https://api.supernova.ai/v1/generate',
+  };
+  return endpoints[provider] || 'unknown';
+};
+
+// Helper function to get default max tokens for model
+const getDefaultMaxTokens = (model: string): number => {
+  if (model.includes('gpt-4')) return 4096;
+  if (model.includes('claude')) return 4096;
+  if (model.includes('gemini')) return 8192;
+  if (model.includes('grok')) return 4096;
+  return 2048;
+};
+
 const emitThinkingEvent = (res: Response, event: {
   kind: 'planning' | 'researching' | 'executing' | 'drafting' | 'user' | 'summary';
   ts: string;
@@ -60,6 +99,406 @@ const emitThinkingEvent = (res: Response, event: {
   console.log('[THINKING EVENT]', thinkingEvent);
   res.write(`data: ${JSON.stringify(thinkingEvent)}\n\n`);
 };
+
+
+
+const detectRepoRoot = (): string => {
+  const cwd = process.cwd();
+  const candidates = [cwd, path.resolve(cwd, '..'), path.resolve(cwd, '../..')];
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(path.join(candidate, 'frontend')) && fs.existsSync(path.join(candidate, 'backend'))) {
+        return candidate;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return cwd;
+};
+
+const repoRoot = detectRepoRoot();
+
+
+const safeExists = (relativePath: string): boolean => {
+  try {
+    return fs.existsSync(path.join(repoRoot, relativePath));
+  } catch {
+    return false;
+  }
+};
+
+
+const readFileSummary = (relativePath: string): { lines: number; content: string } | null => {
+  if (!safeExists(relativePath)) {
+    return null;
+  }
+
+  try {
+    const absolutePath = path.join(repoRoot, relativePath);
+    const content = fs.readFileSync(absolutePath, 'utf-8');
+    const lines = content.split(/\r?\n/).length;
+    return { lines, content };
+  } catch {
+    return null;
+  }
+};
+
+const formatTimestamp = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
+const deriveComponentName = (prompt: string): string => {
+  const tokens = (prompt.match(/[a-z0-9]+/gi) || []).slice(0, 4);
+  if (!tokens.length) return 'GeneratedFeature';
+  return tokens.map(token => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()).join('');
+};
+
+const deriveRouteSlug = (prompt: string): string => {
+  const tokens = (prompt.match(/[a-z0-9]+/gi) || []).slice(0, 4);
+  if (!tokens.length) return 'generated-feature';
+  return tokens.map(token => token.toLowerCase()).join('-');
+};
+
+const deriveFeatureLabel = (prompt: string): string => {
+  const normalized = prompt.trim().replace(/\s+/g, ' ');
+  return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
+};
+
+interface PromptContext {
+  prompt: string;
+  promptLower: string;
+  featureLabel: string;
+  componentName: string;
+  routeSlug: string;
+  isFrontend: boolean;
+  isBackend: boolean;
+  wantsTests: boolean;
+  wantsAuth: boolean;
+}
+
+const buildPromptContext = (prompt: string): PromptContext => {
+  const promptLower = prompt.toLowerCase();
+  const componentName = deriveComponentName(prompt);
+  const routeSlug = deriveRouteSlug(prompt);
+  const featureLabel = deriveFeatureLabel(prompt);
+
+  const isFrontend = /(ui|interface|page|screen|component|frontend|next|react|web|dashboard|timeline|layout|tailwind|css|design)/.test(promptLower);
+  const isBackend = /(api|endpoint|server|backend|express|route|router|handler|rest|crud|graphql|service)/.test(promptLower);
+  const wantsTests = /(test|jest|vitest|coverage|spec|unit)/.test(promptLower);
+  const wantsAuth = /(auth|login|signup|oauth|session|token)/.test(promptLower);
+
+  return {
+    prompt,
+    promptLower,
+    featureLabel,
+    componentName,
+    routeSlug,
+    isFrontend,
+    isBackend,
+    wantsTests,
+    wantsAuth
+  };
+};
+
+
+
+
+const buildCodeOnlyPrompt = (userPrompt: string, context: PromptContext): string => {
+  const fileHints: string[] = [];
+  if (context.isFrontend) {
+    fileHints.push(`frontend/app/page.tsx should render ${context.featureLabel}.`);
+    fileHints.push(`frontend/app/components/${context.componentName}.tsx implements the UI surface.`);
+  }
+  if (context.isBackend) {
+    fileHints.push(`backend/src/routes/${context.routeSlug}.ts exposes API handlers.`);
+  }
+
+  const hintsSection = fileHints.length
+    ? `\nExisting project hints:\n- ${fileHints.join('\n- ')}`
+    : '';
+
+  const instructions = [
+    'You are an autonomous code generator. Generate production-ready source files only.',
+    `Goal: ${context.featureLabel}.`,
+    'Output requirements:',
+    '1. Respond exclusively with Markdown code fences; no narrative or bullet lists outside code.',
+    "2. For each file, start the fence with the language and relative path, e.g. ```tsx frontend/app/page.tsx.",
+    '3. Include every necessary file (components, styles, services) to satisfy the request.',
+    '4. If explanations are required, embed them as comments inside the relevant files.',
+    '5. Do not emit placeholder text, TODOs, or generic project overviews.'
+  ].join('\n');
+
+  return `${instructions}${hintsSection}\n\nUser prompt:\n${userPrompt.trim()}`;
+};
+
+const analyzeExistingFile = (relativePath: string, context: PromptContext): string => {
+  if (!safeExists(relativePath)) {
+    return `not found: ${relativePath}`;
+  }
+
+  const summary = readFileSummary(relativePath);
+  if (!summary) {
+    return `${relativePath} - unable to read`;
+  }
+
+  const { lines, content } = summary;
+  const details: string[] = [`${lines} lines`];
+
+  if (/("use client"|'use client')/.test(content)) {
+    details.push('client component');
+  }
+
+  const exportMatch = content.match(/export\s+default\s+function\s+([A-Za-z0-9_]+)/);
+  if (exportMatch) {
+    details.push(`exports ${exportMatch[1]}`);
+  }
+
+  const referencedComponents = ['AtlasCLI', 'StreamingEditor', 'PreviewPanel', 'PromptInput', 'ModelFeedbackLoop']
+    .filter(name => content.includes(name));
+  if (referencedComponents.length) {
+    details.push(`uses ${referencedComponents.join(', ')}`);
+  }
+
+  if (context.promptLower.includes('timeline') && !content.toLowerCase().includes('timeline')) {
+    details.push('missing timeline keyword');
+  }
+
+  return `${relativePath} - ${details.join('; ')}`;
+};
+
+const buildPlanningSteps = (context: PromptContext): string[] => {
+  const steps: string[] = [];
+
+  const frontendEntry = safeExists('frontend/app/page.tsx')
+    ? 'frontend/app/page.tsx'
+    : safeExists('frontend/src/App.tsx')
+      ? 'frontend/src/App.tsx'
+      : 'frontend/app/page.tsx';
+
+  if (context.isFrontend) {
+    const componentPath = `frontend/app/components/${context.componentName}.tsx`;
+    const stylePath = safeExists('frontend/app/globals.css') ? 'frontend/app/globals.css' : 'frontend/styles/globals.css';
+
+    steps.push(`${safeExists(frontendEntry) ? 'Update' : 'Create'} ${frontendEntry} - render ${context.featureLabel} surface.`);
+    steps.push(`${safeExists(componentPath) ? 'Update' : 'Create'} ${componentPath} - compose feed, composer, and metadata.`);
+    steps.push(`${safeExists(stylePath) ? 'Extend' : 'Create'} ${stylePath} - responsive layout tokens and theme.`);
+  }
+
+  if (context.isBackend) {
+    const routePath = `backend/src/routes/${context.routeSlug}.ts`;
+    const registerPath = 'backend/src/index.ts';
+    steps.push(`${safeExists(routePath) ? 'Update' : 'Create'} ${routePath} - expose REST handlers for ${context.featureLabel}.`);
+    if (safeExists(registerPath)) {
+      steps.push(`Update ${registerPath} - mount /api/${context.routeSlug} router and ensure JSON parsing.`);
+    }
+  }
+
+  if (context.wantsTests) {
+    const testPath = context.isFrontend
+      ? `frontend/app/components/__tests__/${context.componentName}.test.tsx`
+      : `backend/tests/${context.routeSlug}.spec.ts`;
+    steps.push(`${safeExists(testPath) ? 'Update' : 'Create'} ${testPath} - cover happy path, validation, and edge cases.`);
+  }
+
+  const acceptance: string[] = [];
+  if (context.isFrontend) acceptance.push('UI compiles and passes `npm run lint --workspace frontend`');
+  if (context.isBackend) acceptance.push(`GET /api/${context.routeSlug} responds 2xx with sample payload`);
+  if (context.wantsTests) acceptance.push('Added tests pass locally');
+  if (!acceptance.length) acceptance.push('Generated code compiles and lint checks pass');
+  steps.push(`Acceptance: ${acceptance.join('; ')}`);
+
+  return steps;
+};
+
+const collectResearchFindings = (
+  context: PromptContext,
+  targetProvider: string,
+  targetModel: string,
+  modelConfig: any,
+  providerStatus: { configured: boolean; available: boolean; models: string[] }
+): string[] => {
+  const findings: string[] = [];
+
+  findings.push(
+    providerStatus.available
+      ? `${targetProvider} provider ready (models: ${providerStatus.models.join(', ') || 'none listed'}) - backend/src/services/provider-manager.ts`
+      : `${targetProvider} provider missing credentials - configure backend/.env.local`
+  );
+
+  if (modelConfig) {
+    findings.push(`${targetModel} context ${modelConfig.contextWindow?.toLocaleString() || 'unknown'} tokens; max output ${modelConfig.maxTokens || 'n/a'} - backend/src/config/models.json`);
+  } else {
+    findings.push(`Model config missing for ${targetProvider}/${targetModel} - update backend/src/config/models.json`);
+  }
+
+  if (context.isFrontend) {
+    findings.push(analyzeExistingFile('frontend/app/page.tsx', context));
+    findings.push(analyzeExistingFile('frontend/app/components/AtlasCLI.tsx', context));
+    const plannedComponent = `frontend/app/components/${context.componentName}.tsx`;
+    findings.push(analyzeExistingFile(plannedComponent, context));
+  }
+
+  if (context.isBackend) {
+    findings.push(analyzeExistingFile('backend/src/index.ts', context));
+    const plannedRoute = `backend/src/routes/${context.routeSlug}.ts`;
+    findings.push(analyzeExistingFile(plannedRoute, context));
+  }
+
+  return findings.filter(Boolean);
+};
+
+interface ParsedFile {
+  path: string;
+  content: string;
+}
+
+const normalizeGeneratedPath = (rawPath: string, context: PromptContext, index: number): string => {
+  let clean = rawPath.trim();
+
+  while (clean.startsWith('../') || clean.startsWith('..\\')) {
+    clean = clean.slice(3);
+  }
+  while (clean.startsWith('./') || clean.startsWith('.\\')) {
+    clean = clean.slice(2);
+  }
+  while (clean.startsWith('/') || clean.startsWith('\\')) {
+    clean = clean.slice(1);
+  }
+  while (clean.startsWith('.')) {
+    clean = clean.slice(1);
+  }
+
+  clean = clean.replace(/\\/g, '/');
+
+  if (clean.startsWith('frontend') || clean.startsWith('backend')) {
+    return clean;
+  }
+
+  if (context.isFrontend) {
+    if (clean.endsWith('.css')) {
+      return `frontend/app/components/${context.routeSlug || 'generated'}-${index}.module.css`;
+    }
+    if (clean.endsWith('.tsx') || clean.endsWith('.jsx')) {
+      return `frontend/app/components/${context.componentName}${clean.endsWith('.jsx') ? '.jsx' : '.tsx'}`;
+    }
+    if (clean.endsWith('.ts')) {
+      return `frontend/app/services/${context.routeSlug || 'service'}.ts`;
+    }
+  }
+
+  if (context.isBackend) {
+    if (clean.endsWith('.ts') || clean.endsWith('.js')) {
+      const routeName = context.routeSlug || `generated-${index}`;
+      return `backend/src/routes/${routeName}.ts`;
+    }
+  }
+
+  const baseName = context.routeSlug || `generated-${index}`;
+  const ext = clean.includes('.') ? (clean.split('.').pop() || 'txt') : 'txt';
+  const prefix = context.isFrontend ? 'frontend/app/' : 'backend/src/';
+  return `${prefix}${baseName}.${ext}`;
+};
+
+const parseGeneratedFiles = (code: string, context: PromptContext): ParsedFile[] => {
+  const files: ParsedFile[] = [];
+  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  let blockIndex = 0;
+
+  while ((match = codeBlockRegex.exec(code)) !== null) {
+    blockIndex += 1;
+    const language = match[1] || '';
+    const content = match[2].trim();
+    if (!content) continue;
+
+    const blockStart = match.index || 0;
+    const preContext = code.substring(0, blockStart).split(/\r?\n/).slice(-6);
+    let detectedPath = '';
+
+    for (const rawLine of preContext.reverse()) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const pathPatterns = [
+        /`([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)`/,
+        /\*\*([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)\*\*/,
+        /File:?\s*([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)/i,
+        /^(?:#+|\d+[).])\s*([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)/
+      ];
+      for (const pattern of pathPatterns) {
+        const pathMatch = line.match(pattern);
+        if (pathMatch && pathMatch[1]) {
+          detectedPath = pathMatch[1];
+          break;
+        }
+      }
+      if (detectedPath) break;
+    }
+
+    if (!detectedPath) {
+      const ext = language || (context.isFrontend ? 'tsx' : context.isBackend ? 'ts' : 'txt');
+      detectedPath = `${context.routeSlug || 'generated'}-${blockIndex}.${ext}`;
+    }
+
+    files.push({
+      path: normalizeGeneratedPath(detectedPath, context, blockIndex),
+      content
+    });
+  }
+
+  if (files.length) {
+    return files;
+  }
+
+  const fileMarkerRegex = /^(?:\/\/|#|<!--|\/\*)\s*(?:File|Filename|Path):\s*(.+?)(?:\s*(?:-->|\*\/))?\s*$/gim;
+  const markers = Array.from(code.matchAll(fileMarkerRegex));
+  if (markers.length) {
+    for (let i = 0; i < markers.length; i++) {
+      const marker = markers[i];
+      const filePath = marker[1].trim();
+      const start = marker.index! + marker[0].length;
+      const end = i < markers.length - 1 ? markers[i + 1].index! : code.length;
+      const snippet = code.substring(start, end).trim();
+      if (!snippet) continue;
+      files.push({
+        path: normalizeGeneratedPath(filePath, context, i + 1),
+        content: snippet
+      });
+    }
+    return files;
+  }
+
+  return [{
+    path: normalizeGeneratedPath(`${context.routeSlug || 'generated'}.ts`, context, 1),
+    content: code.trim()
+  }];
+};
+
+
+
+const describeGeneratedChange = (file: ParsedFile, context: PromptContext): string => {
+  const relativePath = file.path;
+  const absolutePath = path.join(repoRoot, relativePath);
+  const exists = safeExists(relativePath);
+  const existingContent = exists ? fs.readFileSync(absolutePath, 'utf-8') : '';
+  const existingLines = existingContent ? existingContent.split(/\r?\n/).filter(line => line.trim().length > 0).length : 0;
+  const newLines = file.content.split(/\r?\n/).filter(line => line.trim().length > 0).length;
+  const additions = newLines;
+  const deletions = exists ? Math.max(0, existingLines - newLines) : 0;
+  const statusLabel = exists ? 'updated' : 'new';
+
+  const notes: string[] = [];
+  if (file.content.includes('useState(')) notes.push('useState');
+  if (file.content.includes('useEffect(')) notes.push('useEffect');
+  if (file.content.includes('fetch(')) notes.push('data fetch');
+  if (file.content.includes('router.') || file.content.includes('app.')) notes.push('routing');
+  if (file.content.includes('schema') || file.content.includes('zod')) notes.push('validation');
+  if (!notes.length) notes.push(context.isFrontend ? 'UI scaffold' : context.isBackend ? 'handler logic' : 'generated code');
+
+  return `${relativePath} - +${additions}/-${deletions} (${statusLabel}): ${notes.join(', ')}`;
+};
+
+
 
 router.post('/generate', validateGenerateRequest, async (req: Request, res: Response) => {
   const errors = validationResult(req);
@@ -115,11 +554,8 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
       // 3) Otherwise use routing service
       const context: RoutingContext = {
         mode: routingMode as any,
-        capabilities,
-        priority,
-        maxCost,
-        activeProvider,
-        allowFailover
+        activeProvider: activeProvider || 'openai',
+        allowFailover: allowFailover !== false
       };
 
       const decision = await routingService.makeRoutingDecision(context);
@@ -132,22 +568,21 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
 
     console.log('[/llm/generate] resolved target', { targetProvider, targetModel });
 
+    const promptContext = buildPromptContext(prompt);
+
     // Emit planning event
     if (useStreaming) {
+      const planningSteps = buildPlanningSteps(promptContext);
       emitThinkingEvent(res, {
         kind: 'planning',
-        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        items: [
-          'Analyzing prompt requirements and context',
-          `Selecting AI provider: ${targetProvider}`,
-          `Choosing model: ${targetModel}`,
-          'Preparing code generation strategy'
-        ]
+        ts: formatTimestamp(),
+        items: planningSteps
       });
     }
 
     // Validate provider configuration
-    const providerConfigured = providerManager.isProviderConfigured(targetProvider);
+    const providerStatus = providerManager.getProviderStatus(targetProvider);
+    const providerConfigured = providerStatus.configured;
     if (!providerConfigured) {
       if (useStreaming) {
         res.write(`data: ${JSON.stringify({
@@ -195,15 +630,11 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
 
     // Emit researching event
     if (useStreaming) {
+      const researchItems = collectResearchFindings(promptContext, targetProvider, targetModel, modelConfig, providerStatus);
       emitThinkingEvent(res, {
         kind: 'researching',
-        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        items: [
-          'Checking API availability and authentication',
-          'Validating model configuration',
-          'Preparing request payload',
-          'Setting up response stream'
-        ]
+        ts: formatTimestamp(),
+        items: researchItems
       });
     }
 
@@ -211,33 +642,45 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
     let result;
     let isMock = false;
     let errorMessage: string | undefined;
+    let generatedFiles: ParsedFile[] = [];
     try {
       console.log('[/llm/generate] calling providerManager.generateCode');
 
       // Emit executing event
       if (useStreaming) {
+        const apiEndpoint = getProviderAPIEndpoint(targetProvider);
+        const maxTokens = modelConfig?.maxTokens ?? getDefaultMaxTokens(targetModel);
+        const executingItems: string[] = [
+          `POST ${apiEndpoint} (${prompt.length} chars prompt payload)`,
+          `Headers: model=${targetModel}, max_tokens=${maxTokens}, temperature=0.7`,
+          'Streaming pipeline: frontend/app/api/generate/route.ts -> StreamingEditor.tsx (FILE_OPEN/APPEND events)'
+        ];
+        if (!providerStatus.available) {
+          executingItems.push('Provider unavailable - using mock response path in backend/src/routes/llm.ts');
+        }
         emitThinkingEvent(res, {
           kind: 'executing',
-          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          text: `Generating code with ${targetProvider} ${targetModel}`,
-          items: [
-            'Sending request to AI provider',
-            'Processing AI response',
-            'Formatting generated code'
-          ]
+          ts: formatTimestamp(),
+          items: executingItems
         });
       }
 
-      result = await providerManager.generateCode(targetProvider, targetModel, prompt, modelConfig);
+      const generationPrompt = `${buildCodeOnlyPrompt(prompt, promptContext)}
+
+<BEGIN SPEC>
+${prompt}
+<END SPEC>`;
+      result = await providerManager.generateCode(targetProvider, targetModel, generationPrompt, modelConfig);
       console.log('[/llm/generate] provider call succeeded');
 
       // Emit drafting event
       if (useStreaming) {
+        generatedFiles = parseGeneratedFiles(result, promptContext);
+        const draftingItems = generatedFiles.map(file => describeGeneratedChange(file, promptContext));
         emitThinkingEvent(res, {
           kind: 'drafting',
-          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          text: 'Code generation completed',
-          output: `Generated ${result.length} characters`
+          ts: formatTimestamp(),
+          items: draftingItems.length ? draftingItems : [`Generated ${result.length} chars`]
         });
       }
     } catch (error) {
@@ -340,11 +783,35 @@ console.log("Hello from AI-generated code!");`;
 
     // Emit summary event
     if (useStreaming) {
+      if (!generatedFiles.length) {
+        generatedFiles = parseGeneratedFiles(result, promptContext);
+      }
+
+      const summaryItems: string[] = [];
+      if (generatedFiles.length) {
+        summaryItems.push(`${isMock ? 'Mock fallback generated' : 'Code generated'} - ${generatedFiles.map(file => file.path).join(', ')}`);
+      } else {
+        summaryItems.push(`${isMock ? 'Mock fallback generated' : 'Code generated'} - ${result.length} chars`);
+      }
+
+      summaryItems.push(`Tokens: ${estimatedTokens} | Cost: $${estimatedCost.toFixed(4)}`);
+      const dailyBudget = budgetManager.getBudgetStatus('daily');
+      summaryItems.push(`Daily budget: $${dailyBudget.used.toFixed(2)}/$${dailyBudget.limit.toFixed(2)} (${dailyBudget.percentage.toFixed(2)}% used)`);
+
+      if (isMock) {
+        summaryItems.push(`Configure credentials for ${targetProvider} in backend/.env.local before rerun.`);
+      } else if (promptContext.isFrontend) {
+        summaryItems.push('Next: run npm run lint --workspace frontend.');
+      } else if (promptContext.isBackend) {
+        summaryItems.push('Next: run npm test -- --runInBand from backend/.');
+      } else {
+        summaryItems.push('Next: add validation tests before commit.');
+      }
+
       emitThinkingEvent(res, {
         kind: 'summary',
-        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        text: 'Code generation completed successfully',
-        output: `Model: ${targetModel} | Tokens: ${estimatedTokens} | Cost: $${estimatedCost.toFixed(4)}`
+        ts: formatTimestamp(),
+        items: summaryItems
       });
     }
 
@@ -493,8 +960,8 @@ router.put('/optimization/config', async (req: Request, res: Response) => {
   try {
     const { routing, costOptimization } = req.body;
 
-    if (routing) {
-      routingService.configureOptimization(routing);
+    if (routing && typeof (routingService as any).configureOptimization === 'function') {
+      (routingService as any).configureOptimization(routing);
     }
 
     if (costOptimization) {
@@ -1350,4 +1817,5 @@ router.post('/workflow/generate', async (req: Request, res: Response) => {
 });
 
 export default router;
+
 
