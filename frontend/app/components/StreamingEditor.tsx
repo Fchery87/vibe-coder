@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import CodeEditor from '@/components/Editor';
+import { Sparkles } from 'lucide-react';
 
 interface StreamingFile {
   path: string;
@@ -497,20 +498,10 @@ export default function StreamingEditor({
             onChange={() => {}} // Read-only during streaming
           />
         ) : (
-          <div className="h-full flex items-center justify-center text-[var(--muted)]">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <p className="text-xl font-semibold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                Your Canvas Awaits
-              </p>
-              <p className="text-sm text-[var(--muted)] max-w-md mx-auto">
-                Where brilliant ideas transform into beautiful code, one keystroke at a time ✨
-              </p>
-            </div>
+          <div className="empty-state">
+            <Sparkles className="w-9 h-9" />
+            <h3>Ready to Create</h3>
+            <p>Start streaming to see real-time code generation</p>
           </div>
         )}
       </div>

@@ -13,6 +13,8 @@ import InlineDiff from "@/components/InlineDiff";
 import ModelFeedbackLoop from "@/components/ModelFeedbackLoop";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import HeaderBar from "@/components/HeaderBar";
+import SettingsModal from "@/components/SettingsModal";
 
 interface ProjectSnapshot {
   id: string;
@@ -52,6 +54,7 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash-lite');
   const [allowFailover, setAllowFailover] = useState<boolean>(false);
   const [isRunningQualityCheck, setIsRunningQualityCheck] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [qualityReport, setQualityReport] = useState<{
     lint: any;
     tests: any;
@@ -772,8 +775,34 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
-      {/* Primary Control Bar */}
-      <header className="panel shadow-panel px-4 py-3 mb-[var(--gap-5)]">
+      {/* Header Bar */}
+      <HeaderBar
+        provider={activeProvider}
+        model={selectedModel}
+        streaming={isStreamingMode && isGenerating}
+        thinking={false}
+        streamingFileCount={streamingFileCount}
+        completedStreamingFiles={completedStreamingFiles}
+        totalStreamingLines={totalStreamingLines}
+        cliActivity={cliActivity}
+        metrics={{
+          chars: generatedCode.length,
+          logs: sandboxLogs.length,
+          checkpoints: checkpoints.length,
+          cliFiles: cliModifiedFiles.size
+        }}
+        onToggleStreaming={() => setIsStreamingMode(!isStreamingMode)}
+        onToggleThinking={() => {}}
+        onChangeProvider={() => setIsSettingsOpen(true)}
+        onChangeModel={() => setIsSettingsOpen(true)}
+        onSave={() => createCheckpoint(`Checkpoint ${new Date().toLocaleTimeString()}`, 'Auto-generated checkpoint')}
+        onPR={() => {}}
+        onShare={() => {}}
+        onSettings={() => setIsSettingsOpen(true)}
+      />
+
+      {/* Old header backup - keeping for reference */}
+      <header className="panel shadow-panel px-4 py-3 mb-[var(--gap-5)]" style={{ display: 'none' }}>
         <div className="flex flex-wrap items-center gap-[var(--gap-5)] w-full">
           <div className="flex items-center gap-[var(--gap-3)] min-w-[220px]">
             <div className="w-9 h-9 rounded-[var(--radius)] bg-gradient-to-r from-[#7c3aed] to-[#22d3ee] flex items-center justify-center shadow-panel">
@@ -1327,8 +1356,31 @@ export default function Home() {
         onCommand={handleCommand}
       />
 
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        activeProvider={activeProvider}
+        selectedModel={selectedModel}
+        allowFailover={allowFailover}
+        onProviderChange={(provider) => {
+          setActiveProvider(provider);
+          localStorage.setItem('activeProvider', provider);
+        }}
+        onModelChange={(model) => {
+          setSelectedModel(model);
+          localStorage.setItem('selectedModel', model);
+        }}
+        onFailoverChange={setAllowFailover}
+      />
+
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* Theme Toggle - Floating */}
+      <div className="fixed bottom-4 right-4 z-40">
+        <ThemeToggle />
+      </div>
     </div>
   );
 }
