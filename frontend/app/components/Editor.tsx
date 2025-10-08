@@ -82,31 +82,37 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
     base: 'vs-dark' as any,
     inherit: true,
     rules: [
-      { token: 'comment', foreground: '94a3b8' },
-      { token: 'keyword', foreground: 'c4b5fd' },
-      { token: 'string', foreground: '5eead4' },
-      { token: 'number', foreground: 'fbbf24' },
-      { token: 'type', foreground: 'a5b4fc' },
-      { token: 'class', foreground: 'a5b4fc' },
-      { token: 'identifier', foreground: '93c5fd' },
-      { token: 'variable', foreground: 'e5e7eb' },
+      { token: 'comment', foreground: '94a3b8' },        // slate-400 (muted)
+      { token: 'keyword', foreground: 'c4b5fd' },        // purple-300 (reduced saturation)
+      { token: 'string', foreground: '5eead4' },         // teal-300
+      { token: 'number', foreground: 'fbbf24' },         // amber-400
+      { token: 'type', foreground: 'a5b4fc' },           // indigo-300
+      { token: 'class', foreground: 'a5b4fc' },          // indigo-300
+      { token: 'function', foreground: '93c5fd' },       // blue-300
+      { token: 'identifier', foreground: '93c5fd' },     // blue-300
+      { token: 'variable', foreground: 'e5e7eb' },       // gray-200
     ],
     colors: {
-      'editor.background': '#0f1522', // slate-900
-      'editor.foreground': '#e5e7eb', // slate-100
-      'editor.lineHighlightBackground': '#94a3b80f', // slate-800
-      'editor.selectionBackground': '#7c3aed33', // slate-700
-      'editorCursor.foreground': '#7c3aed', // purple-500
-      'editorWhitespace.foreground': '#1f2937', // slate-600
-      'editorIndentGuide.background': '#1f2937', // slate-700
-      'editorIndentGuide.activeBackground': '#334155', // slate-500
-      'editorWidget.background': '#111826', // slate-800
-      'editorWidget.border': '#1f2937', // slate-700
-      'editorSuggestWidget.background': '#111826', // slate-800
-      'editorSuggestWidget.border': '#1f2937', // slate-700
-      'editorSuggestWidget.selectedBackground': '#7c3aed22', // slate-700
-      'editorHoverWidget.background': '#111826', // slate-800
-      'editorHoverWidget.border': '#1f2937', // slate-700
+      'editor.background': '#0f1522',
+      'editor.foreground': '#e5e7eb',
+      'editor.lineHighlightBackground': '#94a3b80f',
+      'editor.selectionBackground': '#7c3aed33',
+      'editorCursor.foreground': '#7c3aed',
+      'editorWhitespace.foreground': '#1f2937',
+      'editorIndentGuide.background': '#1f2937',
+      'editorIndentGuide.activeBackground': '#334155',
+      'editorLineNumber.foreground': '#475569',
+      'editorLineNumber.activeForeground': '#94a3b8',
+      'editorGutter.background': '#0b1020',              // slightly darker than editor
+      'editorWidget.background': '#111826',
+      'editorWidget.border': '#1f2937',
+      'editorSuggestWidget.background': '#111826',
+      'editorSuggestWidget.border': '#1f2937',
+      'editorSuggestWidget.selectedBackground': '#7c3aed22',
+      'editorHoverWidget.background': '#111826',
+      'editorHoverWidget.border': '#1f2937',
+      'editorError.foreground': '#ef4444',
+      'editorWarning.foreground': '#f59e0b',
     }
   };
 
@@ -237,7 +243,7 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
   return (
     <div className="h-full flex flex-col">
       {/* Header with View Toggle */}
-      <div className="flex items-center justify-between p-3 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--panel-alt)] gap-[var(--gap-4)] flex-shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-white">Code Editor</h3>
           {hasChanges && (
@@ -266,7 +272,7 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
             className={`px-3 py-1 text-xs rounded transition-colors ${
               viewMode === 'editor'
                 ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
+                : 'text-[var(--muted)] hover:text-white hover:bg-slate-700/50'
             }`}
           >
             Editor
@@ -277,7 +283,7 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
             className={`px-3 py-1 text-xs rounded transition-colors ${
               viewMode === 'diff'
                 ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'text-[var(--muted)] hover:text-white hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
           >
             Diff View
@@ -394,8 +400,8 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
       </div>
 
       {/* Footer with Stats */}
-      <div className="p-2 border-t border-slate-700/50 bg-slate-800/50 flex-shrink-0">
-        <div className="flex items-center justify-between text-xs text-gray-400">
+      <div className="px-4 py-2 border-t border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
+        <div className="flex items-center justify-between text-xs text-[var(--muted)]">
           <div className="flex items-center gap-4">
             <span>{(value || "").split('\n').length} lines</span>
             <span>{(value || "").length} chars</span>

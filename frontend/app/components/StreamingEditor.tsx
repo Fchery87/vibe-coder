@@ -401,39 +401,48 @@ export default function StreamingEditor({
 
   return (
     <div className="streaming-editor h-full flex flex-col">
-      {/* Tab Bar */}
+      {/* Tab Bar with fade-edge overflow */}
       {files.length > 0 && (
-        <div className="relative border-b border-slate-700/50 bg-slate-800/30 flex-shrink-0">
-          <div className="flex overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-            {files.map(file => (
-              <div
-                key={file.path}
-                className={`px-3 py-2 text-sm cursor-pointer border-r border-slate-700/50 flex items-center gap-2 whitespace-nowrap flex-shrink-0 ${
-                  activeFile === file.path
-                    ? 'bg-slate-700/50 text-white border-b-2 border-blue-400'
-                    : 'text-gray-300 hover:text-white hover:bg-slate-700/30'
-                }`}
-                onClick={() => setActive(file.path)}
-              >
-                <span className="truncate max-w-40">{file.path.split('/').pop()}</span>
-                {file.status === 'writing' && (
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
-                )}
-                {file.status === 'done' && (
-                  <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
-                )}
-              </div>
-            ))}
+        <div className="relative border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
+          <div className="scroll-fade">
+            <div className="flex overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+              {files.map(file => (
+                <div
+                  key={file.path}
+                  className={`tab flex items-center gap-[var(--gap-2)] px-3 py-2 text-[var(--size-small)] cursor-pointer border-r border-[var(--border)] whitespace-nowrap flex-shrink-0 ${
+                    activeFile === file.path ? 'active' : ''
+                  }`}
+                  onClick={() => setActive(file.path)}
+                >
+                  <span className="truncate max-w-40">{file.path.split('/').pop()}</span>
+                  {file.status === 'writing' && (
+                    <span className="badge on flex items-center gap-1 px-2 py-0.5 text-xs">
+                      <span className="streaming-dots scale-75">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </span>
+                      Writing
+                    </span>
+                  )}
+                  {file.status === 'done' && (
+                    <span className="badge success flex items-center gap-1 px-2 py-0.5 text-xs">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Done
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-          {files.length > 5 && (
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-800 to-transparent pointer-events-none"></div>
-          )}
         </div>
       )}
 
       {/* Editor Header */}
       {files.length > 0 && (
-        <div className="p-3 border-b border-slate-700/50 bg-slate-800/50 flex items-center justify-between flex-shrink-0">
+        <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--panel-alt)] flex items-center justify-between gap-[var(--gap-4)] flex-shrink-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -452,7 +461,7 @@ export default function StreamingEditor({
             )}
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+          <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
             <span>{files.length} file{files.length !== 1 ? 's' : ''}</span>
             <span>•</span>
             <span>{files.filter(f => f.status === 'done').length} complete</span>
@@ -463,14 +472,14 @@ export default function StreamingEditor({
                   setActiveFile('');
                   setIsStreaming(false);
                 }}
-                className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-xs rounded"
+                className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-[var(--text)] hover:text-white text-xs rounded"
                 title="Clear all files and start fresh"
               >
                 New Stream
               </button>
               <button
                 onClick={() => onExitStreaming?.()}
-                className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-xs rounded"
+                className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-[var(--text)] hover:text-white text-xs rounded"
                 title="Exit streaming mode"
               >
                 Exit Stream
@@ -488,17 +497,17 @@ export default function StreamingEditor({
             onChange={() => {}} // Read-only during streaming
           />
         ) : (
-          <div className="h-full flex items-center justify-center text-gray-400">
+          <div className="h-full flex items-center justify-center text-[var(--muted)]">
             <div className="text-center">
               <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-8 h-8 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
               <p className="text-xl font-semibold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 Your Canvas Awaits
               </p>
-              <p className="text-sm text-gray-400 max-w-md mx-auto">
+              <p className="text-sm text-[var(--muted)] max-w-md mx-auto">
                 Where brilliant ideas transform into beautiful code, one keystroke at a time ✨
               </p>
             </div>
@@ -508,7 +517,7 @@ export default function StreamingEditor({
 
       {/* Streaming Controls */}
       {isStreaming && (
-        <div className="p-3 border-t border-slate-700/50 bg-slate-800/50 flex items-center justify-between flex-shrink-0">
+        <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--panel-alt)] flex items-center justify-between gap-[var(--gap-4)] flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
             <span className="text-sm text-blue-300">

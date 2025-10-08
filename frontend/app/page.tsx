@@ -771,7 +771,7 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
+    <div className="min-h-screen bg-[var(--bg)] flex flex-col">
       {/* Primary Control Bar */}
       <header className="panel shadow-panel px-4 py-3 mb-[var(--gap-5)]">
         <div className="flex flex-wrap items-center gap-[var(--gap-5)] w-full">
@@ -787,7 +787,15 @@ export default function Home() {
 
           <div className="flex items-center gap-[var(--gap-3)]">
             <span className={["chip flex items-center gap-[var(--gap-2)]", isStreamingMode ? "on" : "off"].join(" ")}>
-              <span className={["badge-dot", isGenerating ? "" : "off"].filter(Boolean).join(" ")}></span>
+              {isGenerating && isStreamingMode ? (
+                <span className="streaming-dots">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+              ) : (
+                <span className={["badge-dot", isGenerating ? "" : "off"].filter(Boolean).join(" ")}></span>
+              )}
               <span className="font-semibold">Streaming Mode</span>
               {streamingFileCount > 0 && (
                 <span className="text-[var(--size-small)] text-[var(--accent-2)] font-semibold">
@@ -970,11 +978,11 @@ export default function Home() {
       <main className="flex flex-1 min-h-0 gap-[var(--gap-5)] px-4 pb-[var(--gap-5)]">
         {/* Sidebar Toggle Button - Desktop */}
         <div className={`flex items-center justify-center transition-all duration-300 ease-in-out ${
-          isSidebarCollapsed ? 'w-8 bg-slate-800/80' : 'w-6 bg-slate-800/50'
-        } border-r border-slate-700/50 hidden md:flex`}>
+          isSidebarCollapsed ? 'w-8 bg-slate-800/80' : 'w-6 bg-[var(--panel-alt)]'
+        } border-r border-[var(--border)] hidden md:flex`}>
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-2 hover:bg-slate-700/50 rounded transition-colors text-gray-400 hover:text-white touch-manipulation"
+            className="p-2 hover:bg-[rgba(51,65,85,0.5)] rounded transition-colors text-[var(--muted)] hover:text-white touch-manipulation"
             title={isSidebarCollapsed ? "Show Project Files" : "Hide Project Files"}
           >
             {isSidebarCollapsed ? (
@@ -1003,12 +1011,12 @@ export default function Home() {
         )}
 
         {/* Left Sidebar - File Tree */}
-        <aside className={`border-r border-slate-700/50 transition-all duration-300 ease-in-out flex flex-col ${
+        <aside className={`border-r border-[var(--border)] transition-all duration-300 ease-in-out flex flex-col ${
           isSidebarCollapsed ? 'w-0 overflow-hidden md:w-0' : 'w-48 lg:w-64'
         } ${isSidebarCollapsed ? 'hidden md:flex' : 'flex'}`}>
           {/* CLI Modified Files Section */}
           {cliModifiedFiles.size > 0 && (
-            <div className="p-3 border-b border-slate-700/50 bg-blue-500/10">
+            <div className="px-3 py-3 border-b border-[var(--border)] bg-blue-500/10">
               <h4 className="text-xs font-semibold text-blue-300 mb-2 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1045,12 +1053,12 @@ export default function Home() {
 
         {/* Mobile Sidebar */}
         {!isSidebarCollapsed && (
-          <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-72 max-w-[85vw] glass-panel border-r border-slate-700/50 z-40 md:hidden flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
+          <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-72 max-w-[85vw] glass-panel border-r border-[var(--border)] z-40 md:hidden flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
               <h3 className="text-lg font-semibold text-white">Project Files</h3>
               <button
                 onClick={() => setIsSidebarCollapsed(true)}
-                className="p-2 hover:bg-slate-700/50 rounded transition-colors text-gray-400 hover:text-white touch-manipulation"
+                className="p-2 hover:bg-[rgba(51,65,85,0.5)] rounded transition-colors text-[var(--muted)] hover:text-white touch-manipulation"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1068,9 +1076,9 @@ export default function Home() {
           {/* Responsive Layout: Equal-width columns on large screens, stacked on smaller screens */}
           <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 min-h-0 gap-0 xl:gap-0">
             {/* Atlas CLI Column */}
-            <div className="flex flex-col min-h-0 xl:border-r border-slate-700/50">
+            <div className="flex flex-col min-h-0 xl:border-r border-[var(--border)]">
               {/* CLI Header */}
-              <div className="p-3 md:p-4 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
+              <div className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
                 <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
                   <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1083,7 +1091,7 @@ export default function Home() {
 
               {/* Generation Process - Show during generation */}
               {isGenerating && (
-                <div className="px-3 md:px-4 py-2 bg-slate-900/50 backdrop-blur-xl border-b border-slate-700/50">
+                <div className="px-3 md:px-4 py-2 bg-slate-900/50 backdrop-blur-xl border-b border-[var(--border)]">
                   <ModelFeedbackLoop
                     isActive={isGenerating}
                     onComplete={() => {
@@ -1108,7 +1116,7 @@ export default function Home() {
             </div>
 
             {/* Editor/Sandbox Column */}
-            <div className="flex flex-col min-h-0 xl:border-l border-slate-700/50">
+            <div className="flex flex-col min-h-0 xl:border-l border-[var(--border)]">
               {/* Hidden StreamingEditor to keep functions exposed globally - positioned absolutely so it doesn't affect layout */}
               <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
                 <StreamingEditor
@@ -1121,7 +1129,7 @@ export default function Home() {
 
               <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'editor' | 'sandbox')} className="flex-1 flex flex-col min-h-0">
                 {/* Header with Tabs */}
-                <div className="p-3 md:p-4 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
+                <div className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
                   <TabsList className="grid w-full grid-cols-2 mb-2">
                     <TabsTrigger value="editor">Editor</TabsTrigger>
                     <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
@@ -1135,7 +1143,7 @@ export default function Home() {
                         className={`px-3 py-1 text-xs rounded transition-colors ${
                           isStreamingMode
                             ? 'bg-blue-600 text-white'
-                            : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
+                            : 'text-[var(--muted)] hover:text-white hover:bg-[rgba(51,65,85,0.5)]'
                         }`}
                         title="Toggle streaming code generation mode"
                       >
@@ -1173,15 +1181,15 @@ export default function Home() {
                     {runMetadata && activeView === 'sandbox' && (
                       <div className="hidden lg:flex items-center gap-2 text-xs">
                         <div className="flex items-center gap-1">
-                          <span className="text-gray-400">Tokens:</span>
+                          <span className="text-[var(--muted)]">Tokens:</span>
                           <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-gray-400">Cost:</span>
+                          <span className="text-[var(--muted)]">Cost:</span>
                           <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-gray-400">Time:</span>
+                          <span className="text-[var(--muted)]">Time:</span>
                           <span className="text-blue-400 font-mono">{runMetadata.duration.toFixed(1)}s</span>
                         </div>
                       </div>
@@ -1221,9 +1229,9 @@ export default function Home() {
 
           {/* Code Editor - Only show when file is selected */}
           {selectedFile && (
-            <div className="border-t border-slate-700/50">
+            <div className="border-t border-[var(--border)]">
               {/* Editor Header */}
-              <div className="p-3 border-b border-slate-700/50 bg-slate-800/50 flex items-center justify-between flex-shrink-0">
+              <div className="p-3 border-b border-[var(--border)] bg-[var(--panel-alt)] flex items-center justify-between flex-shrink-0">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                   <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1232,7 +1240,7 @@ export default function Home() {
                 </h2>
                 <button
                   onClick={() => setSelectedFile(null)}
-                  className="p-1 hover:bg-slate-700/50 rounded transition-colors text-gray-400 hover:text-white"
+                  className="p-1 hover:bg-[rgba(51,65,85,0.5)] rounded transition-colors text-[var(--muted)] hover:text-white"
                   title="Close Editor"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1268,11 +1276,11 @@ export default function Home() {
                 {runMetadata && (
                   <div className="flex sm:hidden items-center gap-2 text-xs">
                     <div className="flex items-center gap-1">
-                      <span className="text-gray-400">Tokens:</span>
+                      <span className="text-[var(--muted)]">Tokens:</span>
                       <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-gray-400">Cost:</span>
+                      <span className="text-[var(--muted)]">Cost:</span>
                       <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
                     </div>
                   </div>
@@ -1282,10 +1290,10 @@ export default function Home() {
 
             <div className="p-2 md:p-3 flex-1 overflow-auto min-h-0">
               {sandboxLogs.length === 0 ? (
-                <div className="text-gray-400 text-sm font-mono">
+                <div className="text-[var(--muted)] text-sm font-mono">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-green-400">$</span>
-                    <span className="text-gray-300">Ready for sandbox execution...</span>
+                    <span className="text-[var(--text)]">Ready for sandbox execution...</span>
                   </div>
                 </div>
               ) : (
@@ -1299,7 +1307,7 @@ export default function Home() {
                          log.type === 'info' ? 'ℹ️' :
                          '📝'}
                       </span>
-                      <span className="text-gray-300 flex-1">{log.message}</span>
+                      <span className="text-[var(--text)] flex-1">{log.message}</span>
                       <span className="text-gray-500 text-xs flex-shrink-0">
                         {log.timestamp.toLocaleTimeString()}
                       </span>
