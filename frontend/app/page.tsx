@@ -89,6 +89,10 @@ export default function Home() {
   const [isStreamingMode, setIsStreamingMode] = useState(true);
   const [streamingFiles, setStreamingFiles] = useState<Array<{ path: string; status: string; content: string }>>([]);
 
+  const streamingFileCount = streamingFiles.length;
+  const completedStreamingFiles = streamingFiles.filter(file => file.status === 'done').length;
+  const totalStreamingLines = streamingFiles.reduce((total, file) => total + (file.content ? file.content.split('\n').length : 0), 0);
+
   // Load provider and model from localStorage on mount
   useEffect(() => {
     const savedProvider = localStorage.getItem('activeProvider');
@@ -768,41 +772,40 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
-      {/* Modern Glass Header */}
-      <header className="backdrop-blur-xl bg-slate-800/50 border-b border-slate-700/50 p-2 md:p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 md:gap-4">
-            <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-xs md:text-sm">V</span>
+      {/* Primary Control Bar */}
+      <header className="panel shadow-panel px-4 py-3 mb-[var(--gap-5)]">
+        <div className="flex flex-wrap items-center gap-[var(--gap-5)] w-full">
+          <div className="flex items-center gap-[var(--gap-3)] min-w-[220px]">
+            <div className="w-9 h-9 rounded-[var(--radius)] bg-gradient-to-r from-[#7c3aed] to-[#22d3ee] flex items-center justify-center shadow-panel">
+              <span className="text-white font-semibold text-sm">V</span>
             </div>
-            <div>
-              <h1 className="text-lg md:text-xl font-bold text-white tracking-tight">Vibe Coder</h1>
-              <p className="text-xs text-gray-400 hidden sm:block">AI-Powered Development Environment</p>
+            <div className="leading-tight">
+              <h1 className="font-semibold tracking-tight" style={{ fontSize: 'var(--size-h1)' }}>Vibe Coder</h1>
+              <p className="text-[var(--muted)]" style={{ fontSize: 'var(--size-small)', lineHeight: '1.2' }}>AI-powered build and review workspace</p>
             </div>
           </div>
 
-          {/* CLI Activity Indicator */}
-          {cliActivity.isActive && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/20 rounded-full border border-blue-400/30">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-              <span className="text-xs text-blue-300 font-medium">Atlas CLI Active</span>
-              {cliActivity.currentTask && (
-                <span className="text-xs text-blue-200">• {cliActivity.currentTask}</span>
+          <div className="flex items-center gap-[var(--gap-3)]">
+            <span className={["chip flex items-center gap-[var(--gap-2)]", isStreamingMode ? "on" : "off"].join(" ")}>
+              <span className={["badge-dot", isGenerating ? "" : "off"].filter(Boolean).join(" ")}></span>
+              <span className="font-semibold">Streaming Mode</span>
+              {streamingFileCount > 0 && (
+                <span className="text-[var(--size-small)] text-[var(--accent-2)] font-semibold">
+                  {completedStreamingFiles}/{streamingFileCount} files / {totalStreamingLines} lines
+                </span>
               )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 md:gap-4">
-            {isGenerating && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/20 rounded-full border border-purple-400/30">
-                <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                <span className="text-xs text-purple-300 font-medium">Generating...</span>
-              </div>
+            </span>
+            {cliActivity.isActive && (
+              <span className="flex items-center gap-[var(--gap-2)] text-[var(--size-small)] text-[var(--accent-2)]">
+                <span className="w-2 h-2 rounded-full bg-[var(--accent-2)] animate-pulse"></span>
+                {cliActivity.currentTask || 'CLI running'}
+              </span>
             )}
-
-            {/* Provider Selector (always visible - single-model mode only) */}
-            <div className="hidden md:flex items-center gap-2">
-                <span className="text-xs text-gray-400">Provider:</span>
+          </div>
+          <div className="flex flex-1 flex-wrap items-center gap-[var(--gap-4)] min-w-[300px]">
+            <div className="surface-tint flex items-center gap-[var(--gap-3)] px-3 py-2 rounded-[var(--radius)] border border-[rgba(148,163,184,0.12)]">
+              <div className="flex items-center gap-[var(--gap-2)]">
+                <span className="uppercase tracking-[0.08em] text-[var(--size-small)] text-[var(--muted)]">Provider</span>
                 <select
                   value={activeProvider}
                   onChange={(e) => {
@@ -817,16 +820,18 @@ export default function Home() {
                     setSelectedModel(defaultModel);
                     if (defaultModel) localStorage.setItem('selectedModel', defaultModel);
                   }}
-                  className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
+                  className="min-w-[140px]"
                 >
-                  <option value="">Select Provider</option>
+                  <option value="">Select</option>
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic</option>
                   <option value="google">Google</option>
                   <option value="xai">xAI</option>
                 </select>
+              </div>
 
-                <span className="text-xs text-gray-400">Model:</span>
+              <div className="flex items-center gap-[var(--gap-2)]">
+                <span className="uppercase tracking-[0.08em] text-[var(--size-small)] text-[var(--muted)]">Model</span>
                 <select
                   value={selectedModel}
                   onChange={(e) => {
@@ -834,7 +839,7 @@ export default function Home() {
                     setSelectedModel(model);
                     localStorage.setItem('selectedModel', model);
                   }}
-                  className="px-2 py-1 bg-slate-700/50 text-gray-300 text-xs rounded border border-slate-600/50"
+                  className="min-w-[160px]"
                 >
                   {activeProvider === 'xai' && (
                     <>
@@ -872,113 +877,97 @@ export default function Home() {
                       <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
                     </>
                   )}
+                  {!activeProvider && <option value="">Select a provider</option>}
                 </select>
-
-                <label className="flex items-center gap-1 text-xs text-gray-400">
-                  <input
-                    type="checkbox"
-                    checked={allowFailover}
-                    onChange={(e) => setAllowFailover(e.target.checked)}
-                    className="rounded border-slate-600/50"
-                  />
-                  Failover
-                </label>
-
-                {activeProvider && (
-                  <span className="text-xs text-purple-400 font-medium flex items-center gap-1">
-                    🔒 {activeProvider.toUpperCase()}
-                  </span>
-                )}
               </div>
 
-            {/* Checkpoint and Export Controls */}
-            <div className="hidden md:flex items-center gap-1 lg:gap-2">
+              <button
+                onClick={() => setAllowFailover(!allowFailover)}
+                className={`chip flex items-center gap-[var(--gap-2)] ${allowFailover ? 'on' : 'off'}`}
+                type="button"
+              >
+                <span className={`badge-dot ${allowFailover ? '' : 'off'}`}>Failover</span>
+                <span className="text-[var(--size-small)]">{allowFailover ? 'Enabled' : 'Disabled'}</span>
+              </button>
+            </div>
+
+            <div className="hidden md:flex items-center gap-[var(--gap-2)]">
               <button
                 onClick={() => createCheckpoint(`Checkpoint ${new Date().toLocaleTimeString()}`, 'Auto-generated checkpoint')}
                 disabled={isCreatingCheckpoint}
-                className="px-2 lg:px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded border border-blue-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn"
                 title="Create Checkpoint"
               >
-                {isCreatingCheckpoint ? '...' : '💾'}
+                {isCreatingCheckpoint ? '...' : 'Save'}
               </button>
 
               {checkpoints.length > 0 && (
-                <div className="relative">
-                  <select
-                    onChange={(e) => {
-                      const checkpointId = e.target.value;
-                      const checkpoint = checkpoints.find(c => c.id === checkpointId);
-                      if (checkpoint) {
-                        restoreCheckpoint(checkpoint);
-                      }
-                      e.target.value = '';
-                    }}
-                    className="px-2 lg:px-3 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 text-xs rounded border border-orange-400/30 appearance-none"
-                    title="Rollback"
-                  >
-                    <option value="">↶</option>
-                    {checkpoints.map(checkpoint => (
-                      <option key={checkpoint.id} value={checkpoint.id}>
-                        {checkpoint.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  onChange={(e) => {
+                    const checkpointId = e.target.value;
+                    const checkpoint = checkpoints.find(c => c.id === checkpointId);
+                    if (checkpoint) {
+                      restoreCheckpoint(checkpoint);
+                    }
+                    e.target.value = '';
+                  }}
+                  className="min-w-[140px]"
+                  title="Restore checkpoint"
+                >
+                  <option value="">Checkpoints</option>
+                  {checkpoints.map(checkpoint => (
+                    <option key={checkpoint.id} value={checkpoint.id}>
+                      {checkpoint.name}
+                    </option>
+                  ))}
+                </select>
               )}
 
               <button
                 onClick={exportToExpo}
                 disabled={isExportingToExpo || !generatedCode}
-                className="px-2 lg:px-3 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-300 text-xs rounded border border-green-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Expo Export"
+                className="btn"
+                title="Export to Expo"
               >
-                {isExportingToExpo ? '...' : '📱'}
+                {isExportingToExpo ? '...' : 'Expo'}
               </button>
 
               <button
                 onClick={exportToFlutter}
                 disabled={isExportingToExpo || !generatedCode}
-                className="px-2 lg:px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded border border-blue-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Flutter Export"
+                className="btn"
+                title="Export to Flutter"
               >
-                {isExportingToExpo ? '...' : '🦋'}
+                {isExportingToExpo ? '...' : 'Flutter'}
               </button>
 
               <button
                 onClick={runQualityCheck}
                 disabled={isRunningQualityCheck || !generatedCode}
-                className="px-2 lg:px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs rounded border border-purple-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Quality Check"
+                className="btn"
+                title="Run quality checks"
               >
-                {isRunningQualityCheck ? '...' : '✓'}
+                {isRunningQualityCheck ? '...' : 'QA'}
               </button>
             </div>
+          </div>
 
-            <div className="flex items-center gap-1 lg:gap-2 text-xs text-gray-400">
-              <span className="hidden sm:inline">{generatedCode.length} chars</span>
-              <span className="sm:hidden">{generatedCode.length}</span>
-              <span>•</span>
-              <span className="hidden md:inline">{sandboxLogs.length} logs</span>
-              <span className="md:hidden">{sandboxLogs.length}</span>
-              <span className="hidden lg:inline">•</span>
-              <span className="hidden lg:inline">{checkpoints.length} checkpoints</span>
+          <div className="flex items-center gap-[var(--gap-3)] ml-auto">
+            <div className="status-metrics">
+              <span><span className="text-[var(--muted)]">chars</span><strong>{generatedCode.length}</strong></span>
+              <span><span className="text-[var(--muted)]">logs</span><strong>{sandboxLogs.length}</strong></span>
+              <span><span className="text-[var(--muted)]">checkpoints</span><strong>{checkpoints.length}</strong></span>
               {cliModifiedFiles.size > 0 && (
-                <>
-                  <span className="hidden lg:inline">•</span>
-                  <span className="text-blue-400">{cliModifiedFiles.size} CLI files</span>
-                </>
+                <span><span className="text-[var(--muted)]">CLI</span><strong>{cliModifiedFiles.size}</strong></span>
               )}
             </div>
-
-            {/* Theme Toggle */}
             <ThemeToggle />
           </div>
         </div>
       </header>
 
 
-      {/* Main Layout - Responsive Grid */}
-      <div className="flex flex-1 min-h-0">
+      <main className="flex flex-1 min-h-0 gap-[var(--gap-5)] px-4 pb-[var(--gap-5)]">
         {/* Sidebar Toggle Button - Desktop */}
         <div className={`flex items-center justify-center transition-all duration-300 ease-in-out ${
           isSidebarCollapsed ? 'w-8 bg-slate-800/80' : 'w-6 bg-slate-800/50'
@@ -1321,7 +1310,7 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Command Palette */}
       <CommandPalette

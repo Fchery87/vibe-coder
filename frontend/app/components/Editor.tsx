@@ -9,6 +9,58 @@ interface CodeEditorProps {
   originalValue?: string; // For diff comparison
 }
 
+// Pill decoration helpers
+function pillClass(severity: number) {
+  // Monaco MarkerSeverity: Error=8, Warning=4, Info=2
+  if (severity >= 8) return 'monaco-pill error';
+  if (severity >= 4) return 'monaco-pill warn';
+  return '';
+}
+
+function pillText(severity: number, message: string) {
+  const head = (message || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+  if (severity >= 8) return head ? `Error: ${head}…` : 'Error';
+  if (severity >= 4) return head ? `Warn: ${head}…` : 'Warn';
+  return '';
+}
+
+function buildPillDecorations(editor: any, monaco: any) {
+  const model = editor.getModel();
+  if (!model) return [];
+  const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+
+  // group markers by line
+  const byLine = new Map<number, any[]>();
+  for (const m of markers) {
+    const line = m.endLineNumber ?? m.startLineNumber ?? 1;
+    (byLine.get(line) || byLine.set(line, []).get(line))!.push(m);
+  }
+
+  const decorations: any[] = [];
+  // Balanced preset: 1 per line, at most 8 per visible viewport
+  const viewport = editor.getVisibleRanges();
+  let budget = 8;
+  for (const r of viewport) {
+    for (let line = r.startLineNumber; line <= r.endLineNumber; line++) {
+      if (budget <= 0) break;
+      const ms = byLine.get(line);
+      if (!ms || ms.length === 0) continue;
+      ms.sort((a: any, b: any) => b.severity - a.severity);
+      const top = ms[0];
+      const cls = pillClass(top.severity);
+      if (!cls) continue;
+      const txt = pillText(top.severity, top.message || '');
+      const maxCol = model.getLineMaxColumn(line);
+      decorations.push({
+        range: new monaco.Range(line, maxCol, line, maxCol),
+        options: { after: { content: ` ${txt}`, inlineClassName: cls } },
+      });
+      budget--;
+    }
+  }
+  return decorations;
+}
+
 export default function CodeEditor({ value, onChange, originalValue }: CodeEditorProps) {
   const [viewMode, setViewMode] = useState<'editor' | 'diff'>('editor');
   const [hasChanges, setHasChanges] = useState(false);
@@ -25,37 +77,77 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
     defineTheme();
   }, []);
 
-  // Custom theme matching site colors
+  // Custom theme matching design tokens
   const vibeTheme = {
     base: 'vs-dark' as any,
     inherit: true,
     rules: [
-      { token: 'comment', foreground: '64748b' }, // slate-500
-      { token: 'keyword', foreground: '8b5cf6' }, // purple-500
-      { token: 'string', foreground: '22c55e' }, // green-500
-      { token: 'number', foreground: 'f59e0b' }, // amber-500
-      { token: 'type', foreground: '06b6d4' }, // cyan-500
-      { token: 'class', foreground: '8b5cf6' }, // purple-500
-      { token: 'function', foreground: '3b82f6' }, // blue-500
-      { token: 'variable', foreground: 'f1f5f9' }, // slate-100
+      { token: 'comment', foreground: '94a3b8' },
+      { token: 'keyword', foreground: 'c4b5fd' },
+      { token: 'string', foreground: '5eead4' },
+      { token: 'number', foreground: 'fbbf24' },
+      { token: 'type', foreground: 'a5b4fc' },
+      { token: 'class', foreground: 'a5b4fc' },
+      { token: 'identifier', foreground: '93c5fd' },
+      { token: 'variable', foreground: 'e5e7eb' },
     ],
     colors: {
-      'editor.background': '#0f172a', // slate-900
-      'editor.foreground': '#f1f5f9', // slate-100
-      'editor.lineHighlightBackground': '#1e293b', // slate-800
-      'editor.selectionBackground': '#334155', // slate-700
-      'editorCursor.foreground': '#8b5cf6', // purple-500
-      'editorWhitespace.foreground': '#475569', // slate-600
-      'editorIndentGuide.background': '#334155', // slate-700
-      'editorIndentGuide.activeBackground': '#64748b', // slate-500
-      'editorWidget.background': '#1e293b', // slate-800
-      'editorWidget.border': '#334155', // slate-700
-      'editorSuggestWidget.background': '#1e293b', // slate-800
-      'editorSuggestWidget.border': '#334155', // slate-700
-      'editorSuggestWidget.selectedBackground': '#334155', // slate-700
-      'editorHoverWidget.background': '#1e293b', // slate-800
-      'editorHoverWidget.border': '#334155', // slate-700
+      'editor.background': '#0f1522', // slate-900
+      'editor.foreground': '#e5e7eb', // slate-100
+      'editor.lineHighlightBackground': '#94a3b80f', // slate-800
+      'editor.selectionBackground': '#7c3aed33', // slate-700
+      'editorCursor.foreground': '#7c3aed', // purple-500
+      'editorWhitespace.foreground': '#1f2937', // slate-600
+      'editorIndentGuide.background': '#1f2937', // slate-700
+      'editorIndentGuide.activeBackground': '#334155', // slate-500
+      'editorWidget.background': '#111826', // slate-800
+      'editorWidget.border': '#1f2937', // slate-700
+      'editorSuggestWidget.background': '#111826', // slate-800
+      'editorSuggestWidget.border': '#1f2937', // slate-700
+      'editorSuggestWidget.selectedBackground': '#7c3aed22', // slate-700
+      'editorHoverWidget.background': '#111826', // slate-800
+      'editorHoverWidget.border': '#1f2937', // slate-700
     }
+  };
+
+  const vibeLight = {
+    base: 'vs' as any,
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '64748b' },
+      { token: 'keyword', foreground: '7c3aed' },
+      { token: 'string', foreground: '0d9488' },
+      { token: 'number', foreground: 'd97706' },
+      { token: 'type', foreground: '6366f1' },
+      { token: 'class', foreground: '6366f1' },
+      { token: 'identifier', foreground: '2563eb' },
+      { token: 'variable', foreground: '0f172a' },
+    ],
+    colors: {
+      'editor.background': '#ffffff',
+      'editor.foreground': '#0f172a',
+      'editor.selectionBackground': '#7c3aed22',
+      'editor.selectionHighlightBackground': '#7c3aed1a',
+      'editor.inactiveSelectionBackground': '#7c3aed14',
+      'editorCursor.foreground': '#7c3aed',
+      'editor.lineHighlightBackground': '#1f29370a',
+      'editorGutter.background': '#f1f5f9',
+      'editorLineNumber.foreground': '#64748b',
+      'editorLineNumber.activeForeground': '#0f172a',
+      'editorWhitespace.foreground': '#e2e8f0',
+      'editorIndentGuide.background': '#e2e8f0',
+      'editorIndentGuide.activeBackground': '#cbd5e1',
+      'editorWidget.background': '#ffffff',
+      'editorWidget.border': '#e2e8f0',
+      'editorSuggestWidget.background': '#ffffff',
+      'editorSuggestWidget.border': '#e2e8f0',
+      'editorSuggestWidget.selectedBackground': '#7c3aed22',
+      'editorHoverWidget.background': '#ffffff',
+      'editorHoverWidget.border': '#e2e8f0',
+      'editorError.foreground': '#dc2626',
+      'editorWarning.foreground': '#d97706',
+      'editorInfo.foreground': '#0284c7',
+    },
   };
 
   // Check if there are changes for diff view
@@ -194,7 +286,7 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
       </div>
 
       {/* Editor Content */}
-      <div className="flex-1 min-h-0 bg-slate-900/80 backdrop-blur-sm">
+      <div className="flex-1 min-h-0 editor-shell">
         {viewMode === 'editor' ? (
           <MonacoEditor
             height="100%"
@@ -205,6 +297,45 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
             options={editorOptions}
             beforeMount={(monaco) => {
               monaco.editor.defineTheme('vibe', vibeTheme);
+              monaco.editor.defineTheme('vibe-light', vibeLight);
+            }}
+            onMount={(editor, monaco) => {
+              // Dynamic theme switching
+              const applyTheme = () => {
+                const isLight = document.documentElement.classList.contains('light');
+                editor.updateOptions({ theme: isLight ? 'vibe-light' : 'vibe' });
+              };
+              applyTheme();
+
+              // Balanced inline pills
+              let currentDecorations: string[] = [];
+              const update = () => {
+                currentDecorations = editor.deltaDecorations(
+                  currentDecorations,
+                  buildPillDecorations(editor, monaco)
+                );
+              };
+              update();
+
+              const unsubMarkers = monaco.editor.onDidChangeMarkers(update);
+
+              let raf = 0;
+              const unsubScroll = editor.onDidScrollChange(() => {
+                if (raf) cancelAnimationFrame(raf);
+                raf = requestAnimationFrame(update);
+              });
+
+              const unsubContent = editor.onDidChangeModelContent(update);
+
+              const mo = new MutationObserver(applyTheme);
+              mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+              editor.onDidDispose(() => {
+                unsubMarkers.dispose();
+                unsubScroll.dispose();
+                unsubContent.dispose();
+                mo.disconnect();
+              });
             }}
           />
         ) : (
@@ -217,6 +348,46 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
             options={diffOptions}
             beforeMount={(monaco) => {
               monaco.editor.defineTheme('vibe', vibeTheme);
+              monaco.editor.defineTheme('vibe-light', vibeLight);
+            }}
+            onMount={(editor, monaco) => {
+              // Dynamic theme switching
+              const applyTheme = () => {
+                const isLight = document.documentElement.classList.contains('light');
+                monaco.editor.setTheme(isLight ? 'vibe-light' : 'vibe');
+              };
+              applyTheme();
+
+              // Balanced inline pills for modified editor
+              const modifiedEditor = editor.getModifiedEditor();
+              let currentDecorations: string[] = [];
+              const update = () => {
+                currentDecorations = modifiedEditor.deltaDecorations(
+                  currentDecorations,
+                  buildPillDecorations(modifiedEditor, monaco)
+                );
+              };
+              update();
+
+              const unsubMarkers = monaco.editor.onDidChangeMarkers(update);
+
+              let raf = 0;
+              const unsubScroll = modifiedEditor.onDidScrollChange(() => {
+                if (raf) cancelAnimationFrame(raf);
+                raf = requestAnimationFrame(update);
+              });
+
+              const unsubContent = modifiedEditor.onDidChangeModelContent(update);
+
+              const mo = new MutationObserver(applyTheme);
+              mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+              modifiedEditor.onDidDispose(() => {
+                unsubMarkers.dispose();
+                unsubScroll.dispose();
+                unsubContent.dispose();
+                mo.disconnect();
+              });
             }}
           />
         )}
@@ -244,3 +415,15 @@ export default function CodeEditor({ value, onChange, originalValue }: CodeEdito
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+

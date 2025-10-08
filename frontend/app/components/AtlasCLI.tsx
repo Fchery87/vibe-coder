@@ -1119,136 +1119,139 @@ Try: npm install, git status, ls, or any shell command`;
     }
   };
 
+  const activityDotClass = [
+    'w-2.5 h-2.5 rounded-full',
+    cliActivity.isActive ? 'bg-[var(--accent-2)] animate-pulse' : 'bg-[var(--success)]'
+  ].join(' ');
+
+  const thinkingChipClass = [
+    'chip flex items-center gap-[var(--gap-2)]',
+    isThinkMode ? 'on' : 'off'
+  ].join(' ');
+
+  const thinkingBadgeClass = ['badge-dot', isThinkMode ? '' : 'off'].filter(Boolean).join(' ');
+
   return (
-    <div className="flex flex-col h-full bg-slate-900 font-mono" style={{ fontSize: 'var(--code-size)' }}>
-      {/* CLI Header */}
-      <div className="flex items-center justify-between p-3 border-b border-slate-700/50 bg-slate-800/50 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${cliActivity.isActive ? 'bg-blue-400 animate-pulse' : 'bg-green-400'}`}></div>
-          <span className="text-green-400 font-bold" style={{ fontSize: 'var(--h3-size)' }}>Atlas CLI</span>
-          <span className="text-gray-400 text-small">Genie Agent v1.0</span>
+    <div className="panel flex flex-col h-full font-mono overflow-hidden" style={{ fontSize: 'var(--size-code)' }}>
+      <header className="flex items-center justify-between gap-[var(--gap-4)] border-b border-[rgba(148,163,184,0.12)] bg-[rgba(17,24,38,0.55)] px-4 py-3 flex-shrink-0">
+        <div className="flex items-center gap-[var(--gap-3)]">
+          <span className={activityDotClass}></span>
+          <div className="leading-tight">
+            <span className="text-[var(--text)] font-semibold">Atlas CLI</span>
+            <div className="text-[var(--muted)] text-[var(--size-small)]">Genie Agent v1.0</div>
+          </div>
           {cliActivity.isActive && (
-            <span className="text-small text-blue-400 bg-blue-400/20 px-2 py-1 rounded">
+            <span className="chip on flex items-center gap-[var(--gap-2)] text-[var(--size-small)] text-[var(--accent-2)]">
               {cliActivity.currentTask}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          {/* Thinking Mode Toggle */}
+        <div className="flex items-center gap-[var(--gap-3)]">
           <button
             onClick={toggleThinkingMode}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-small font-medium transition-all ${
-              isThinkMode
-                ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-400/30'
-                : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700 border border-gray-600/30'
-            }`}
-            title={isThinkMode ? 'Click to disable thinking mode' : 'Click to enable thinking mode'}
+            className={thinkingChipClass}
+            type="button"
+            title={isThinkMode ? 'Disable thinking mode' : 'Enable thinking mode'}
           >
-            <span className="text-base">{isThinkMode ? '🧠' : '💭'}</span>
+            <span className={thinkingBadgeClass}></span>
             <span>Thinking Mode</span>
-            <span className={`text-small ${isThinkMode ? 'text-purple-400' : 'text-gray-500'}`}>
-              {isThinkMode ? 'ON' : 'OFF'}
-            </span>
+            <span className="text-[var(--size-small)]">{isThinkMode ? 'ON' : 'OFF'}</span>
           </button>
-
-          <div className="flex items-center gap-2 text-small text-gray-400">
-            <span>{commands.length} commands</span>
-            <span>•</span>
-            <span>{modifiedFiles.size} files modified</span>
-            <span>•</span>
-            <span>{cliActivity.isActive ? 'Executing...' : 'Ready'}</span>
+          <div className="status-metrics">
+            <span><span className="text-[var(--muted)]">commands</span><strong>{commands.length}</strong></span>
+            <span><span className="text-[var(--muted)]">files</span><strong>{modifiedFiles.size}</strong></span>
+            <span><span className="text-[var(--muted)]">status</span><strong>{cliActivity.isActive ? 'Running' : 'Ready'}</strong></span>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Modified Files Banner */}
       {modifiedFiles.size > 0 && (
-        <div className="p-2 bg-blue-500/20 border-b border-blue-400/30">
-          <div className="flex items-center gap-2 text-small">
-            <span className="text-blue-400">📁 Files modified by CLI:</span>
-            <div className="flex gap-1 flex-wrap">
-              {Array.from(modifiedFiles).map(file => (
-                <span key={file} className="bg-blue-400/20 text-blue-300 px-2 py-1 rounded text-small">
-                  {file}
-                </span>
-              ))}
-            </div>
-            <button
-              onClick={() => setModifiedFiles(new Set())}
-              className="text-gray-400 hover:text-white ml-auto"
-              title="Clear file modification indicators"
-            >
-              ✕
-            </button>
+        <div className="border-b border-[rgba(34,211,238,0.2)] bg-[rgba(34,211,238,0.08)] px-4 py-2 flex items-center gap-[var(--gap-2)] text-[var(--size-small)] text-[var(--accent-2)]">
+          <span className="font-medium">Modified:</span>
+          <div className="flex gap-[var(--gap-2)] flex-wrap">
+            {Array.from(modifiedFiles).map(file => (
+              <span key={file} className="chip on text-[var(--size-small)] text-[var(--accent-2)] bg-[rgba(34,211,238,0.05)] border-[rgba(34,211,238,0.25)]">
+                {file}
+              </span>
+            ))}
           </div>
+          <button
+            onClick={() => setModifiedFiles(new Set())}
+            className="ml-auto text-[var(--muted)] hover:text-[var(--text)] transition-colors text-[var(--size-small)]"
+            type="button"
+            title="Clear modified files"
+          >
+            Clear
+          </button>
         </div>
       )}
 
-      {/* CLI Output Area */}
-      <div
-        ref={outputRef}
-        className="flex-1 overflow-auto p-4 space-y-2 min-h-0"
-      >
-        {commands.map((cmd) => (
-          <div key={cmd.id} className="space-y-1">
-            {/* Command Input Line */}
-            {cmd.type === 'command' && (
-              <div className="flex items-start gap-2">
-                <span className="text-green-400 flex-shrink-0">$</span>
-                <span className="text-gray-200">{cmd.command}</span>
-                <span className="text-gray-500 text-small ml-auto flex-shrink-0">
-                  {cmd.timestamp.toLocaleTimeString()}
-                </span>
-              </div>
-            )}
-
-            {/* Command Output */}
-            {cmd.output && (
-              <div className={`ml-4 pl-4 border-l-2 ${getTypeColor(cmd.type)}`}>
-                <div className="text-gray-300 whitespace-pre-wrap leading-relaxed">
-                  {cmd.output}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div
+          ref={outputRef}
+          className="flex-1 overflow-auto px-4 py-3 space-y-[var(--gap-2)] scrollbar-thin"
+        >
+          {commands.map((cmd) => (
+            <div key={cmd.id} className="space-y-[var(--gap-1)]">
+              {cmd.type === 'command' && (
+                <div className="flex items-start gap-[var(--gap-2)]">
+                  <span className="text-[var(--accent-2)] flex-shrink-0">$</span>
+                  <span className="text-[var(--text)]">{cmd.command}</span>
+                  <span className="text-[var(--muted)] text-[var(--size-small)] ml-auto flex-shrink-0">
+                    {cmd.timestamp.toLocaleTimeString()}
+                  </span>
                 </div>
-                {cmd.executionTime && (
-                  <div className="text-small text-gray-500 mt-1">
-                    Completed in {cmd.executionTime}ms
+              )}
+
+              {cmd.output && (
+                <div className={['ml-4 pl-4 border-l-2', getTypeColor(cmd.type)].join(' ')}>
+                  <div className="text-[var(--muted)] whitespace-pre-wrap leading-relaxed">
+                    {cmd.output}
                   </div>
-                )}
-              </div>
-            )}
+                  {cmd.executionTime && (
+                    <div className="text-[var(--size-small)] text-[var(--muted)] mt-1">
+                      Completed in {cmd.executionTime}ms
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t border-[rgba(148,163,184,0.12)] bg-[rgba(11,16,32,0.9)] px-4 py-3 shadow-[0_-6px_18px_rgba(8,12,24,0.45)]">
+          <div className="flex items-center gap-[var(--gap-2)] text-[var(--size-small)] text-[var(--muted)] mb-2">
+            <span>Up arrow: history</span>
+            <span>|</span>
+            <span>Tab: autocomplete</span>
+            <span>|</span>
+            <span>Enter: execute</span>
           </div>
-        ))}
-
-        {/* Current command input */}
-        <div className="flex items-start gap-2 sticky bottom-0 bg-slate-900 pb-2">
-          <span className="text-green-400 flex-shrink-0">
-            {isExecuting ? '>' : '$'}
-          </span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={currentCommand}
-            onChange={(e) => setCurrentCommand(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent border-0 outline-none text-gray-200 placeholder-gray-500"
-            style={{ fontSize: 'var(--code-size)' }}
-            placeholder={isExecuting ? "Executing command..." : "Just describe what you want to build..."}
-            disabled={isExecuting}
-            spellCheck={false}
-            autoComplete="off"
-          />
-          <span className="text-gray-500 text-small flex-shrink-0">
-            {currentCommand.length > 0 && `${currentCommand.length} chars`}
-          </span>
+          <div className="flex items-center gap-[var(--gap-3)]">
+            <span className="text-[var(--accent-2)] flex-shrink-0">{isExecuting ? '>' : '$'}</span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={currentCommand}
+              onChange={(e) => setCurrentCommand(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 border border-[rgba(148,163,184,0.16)] bg-[rgba(15,20,33,0.92)] rounded-[var(--radius)] px-3 py-2 text-[var(--text)] placeholder-[rgba(148,163,184,0.6)] focus:outline-none focus:ring-0 focus:border-[rgba(124,58,237,0.45)]"
+              placeholder={isExecuting ? "Executing command..." : "Just describe what you want to build..."}
+              disabled={isExecuting}
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <span className="text-[var(--muted)] text-[var(--size-small)] flex-shrink-0">
+              {currentCommand.length > 0 ? `${currentCommand.length} chars` : ''}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* CLI Footer */}
-      <div className="p-2 border-t border-slate-700/50 bg-slate-800/30 flex-shrink-0">
-        <div className="flex items-center justify-between text-small text-gray-400">
-          <span>↑↓ for history • Tab for autocomplete • Full local shell access</span>
-          <span>Atlas is ready to execute</span>
-        </div>
-      </div>
+      <footer className="px-4 py-2 border-t border-[rgba(148,163,184,0.12)] bg-[rgba(17,24,38,0.6)] text-[var(--size-small)] text-[var(--muted)] flex items-center justify-between">
+        <span>Atlas has full local shell access</span>
+        <span>{cliActivity.isActive ? 'Working...' : 'Ready'}</span>
+      </footer>
     </div>
   );
 }
