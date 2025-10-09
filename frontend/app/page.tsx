@@ -15,6 +15,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import HeaderBar from "@/components/HeaderBar";
 import SettingsModal from "@/components/SettingsModal";
+import { GitHubRepository, WorkspaceState } from "@/lib/github-types";
 
 interface ProjectSnapshot {
   id: string;
@@ -91,6 +92,17 @@ export default function Home() {
   }>({ isActive: false });
   const [isStreamingMode, setIsStreamingMode] = useState(true);
   const [streamingFiles, setStreamingFiles] = useState<Array<{ path: string; status: string; content: string }>>([]);
+
+  // GitHub workspace state
+  const [githubEnabled, setGithubEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('githubEnabled');
+      return saved ? JSON.parse(saved) : false; // Disabled by default
+    }
+    return false;
+  });
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
 
   const streamingFileCount = streamingFiles.length;
   const completedStreamingFiles = streamingFiles.filter(file => file.status === 'done').length;
@@ -681,6 +693,51 @@ export default function Home() {
     setActiveView('editor');
   };
 
+  // GitHub handlers
+  const handleGitHubConnect = () => {
+    setGithubConnected(true);
+    addToast('GitHub connected successfully!', 'success');
+  };
+
+  const handleGitHubDisconnect = () => {
+    setGithubConnected(false);
+    setWorkspace(null);
+    addToast('GitHub disconnected', 'info');
+  };
+
+  const handleRepoSelect = (repo: GitHubRepository, installationId: number) => {
+    const newWorkspace: WorkspaceState = {
+      owner: repo.owner.login,
+      repo: repo.name,
+      installationId,
+      branch: repo.default_branch,
+      baseBranch: repo.default_branch,
+    };
+    setWorkspace(newWorkspace);
+    addToast(`Workspace opened: ${repo.full_name}`, 'success');
+
+    // Log to Atlas CLI
+    setSandboxLogs(prev => [...prev, {
+      type: 'info',
+      message: `📂 Workspace opened: ${repo.full_name} (${repo.default_branch})`,
+      timestamp: new Date()
+    }]);
+  };
+
+  const handleGitHubEnabledChange = (enabled: boolean) => {
+    setGithubEnabled(enabled);
+    localStorage.setItem('githubEnabled', JSON.stringify(enabled));
+
+    if (!enabled) {
+      // Clear GitHub state when disabled
+      setGithubConnected(false);
+      setWorkspace(null);
+      addToast('GitHub integration disabled', 'info');
+    } else {
+      addToast('GitHub integration enabled', 'success');
+    }
+  };
+
   // Expose function to switch to editor view globally for Atlas CLI
   useEffect(() => {
     (window as any).switchToEditorView = () => {
@@ -777,8 +834,6 @@ export default function Home() {
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
       {/* Header Bar */}
       <HeaderBar
-        provider={activeProvider}
-        model={selectedModel}
         streaming={isStreamingMode && isGenerating}
         thinking={false}
         streamingFileCount={streamingFileCount}
@@ -793,12 +848,15 @@ export default function Home() {
         }}
         onToggleStreaming={() => setIsStreamingMode(!isStreamingMode)}
         onToggleThinking={() => {}}
-        onChangeProvider={() => setIsSettingsOpen(true)}
-        onChangeModel={() => setIsSettingsOpen(true)}
         onSave={() => createCheckpoint(`Checkpoint ${new Date().toLocaleTimeString()}`, 'Auto-generated checkpoint')}
         onPR={() => {}}
         onShare={() => {}}
         onSettings={() => setIsSettingsOpen(true)}
+        githubEnabled={githubEnabled}
+        githubConnected={githubConnected}
+        onGitHubConnect={handleGitHubConnect}
+        onGitHubDisconnect={handleGitHubDisconnect}
+        onRepoSelect={handleRepoSelect}
       />
 
       {/* Old header backup - keeping for reference */}
@@ -1140,6 +1198,7 @@ export default function Home() {
                   sandboxLogs={sandboxLogs}
                   onFileModified={handleCliFileModified}
                   onCliActivity={handleCliActivity}
+                  githubEnabled={githubEnabled}
                 />
               </div>
             </div>
@@ -1363,6 +1422,7 @@ export default function Home() {
         activeProvider={activeProvider}
         selectedModel={selectedModel}
         allowFailover={allowFailover}
+        githubEnabled={githubEnabled}
         onProviderChange={(provider) => {
           setActiveProvider(provider);
           localStorage.setItem('activeProvider', provider);
@@ -1372,6 +1432,7 @@ export default function Home() {
           localStorage.setItem('selectedModel', model);
         }}
         onFailoverChange={setAllowFailover}
+        onGitHubEnabledChange={handleGitHubEnabledChange}
       />
 
       {/* Toast Notifications */}

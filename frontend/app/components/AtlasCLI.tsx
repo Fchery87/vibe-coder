@@ -2,6 +2,25 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { ShellExecutor } from '@/services/shellExecutor';
+import { useWebhookEvents } from '@/hooks/useWebhookEvents';
+import { WebhookEvent } from '@/lib/github-types';
+import {
+  Rocket,
+  Lightbulb,
+  Zap,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Info,
+  Terminal,
+  GitBranch,
+  MessageSquare,
+  FileEdit,
+  GitPullRequest,
+  GitCommit,
+  Folder,
+  ArrowUpCircle
+} from 'lucide-react';
 
 interface CLICommand {
   id: string;
@@ -10,6 +29,7 @@ interface CLICommand {
   timestamp: Date;
   type: 'command' | 'response' | 'error' | 'success' | 'info';
   executionTime?: number;
+  icon?: 'push' | 'pr' | 'comment' | 'review' | 'check' | 'info' | 'rocket' | 'lightbulb' | 'folder';
 }
 
 interface ThinkEvent {
@@ -28,6 +48,7 @@ interface AtlasCLIProps {
   sandboxLogs?: any[];
   onFileModified?: (filePath: string, operation: string) => void;
   onCliActivity?: (activity: { isActive: boolean; currentTask?: string; progress?: number }) => void;
+  githubEnabled?: boolean;
 }
 
 export default function AtlasCLI({
@@ -37,7 +58,8 @@ export default function AtlasCLI({
   executionResult,
   sandboxLogs,
   onFileModified,
-  onCliActivity
+  onCliActivity,
+  githubEnabled = false
 }: AtlasCLIProps) {
   const [commands, setCommands] = useState<CLICommand[]>([
     {
@@ -45,27 +67,27 @@ export default function AtlasCLI({
       command: 'atlas --help',
       output: `Atlas CLI - AI Code Generator with Real-Time Streaming
 
-🚀 Quick Start:
+Quick Start:
   Just type what you want to build and press Enter!
   Code streams in REAL-TIME with proper formatting!
 
-💡 Examples:
+Examples:
   "Create a React todo app"
   "Build a weather dashboard"
   "Make a chat component with emoji reactions"
   "Design a login form with validation"
   "Create a simple ping pong game"
 
-⚡ Streaming Features:
-  ✓ Real-time code generation
-  ✓ Automatic code formatting
-  ✓ Multi-file support
-  ✓ Line-by-line streaming
+Streaming Features:
+  • Real-time code generation
+  • Automatic code formatting
+  • Multi-file support
+  • Line-by-line streaming
 
-🔧 Advanced Commands:
+Advanced Commands:
   Type /commands to see all available commands
 
-Ready to build something amazing? Just describe it! ✨`,
+Ready to build something amazing? Just describe it!`,
       timestamp: new Date(),
       type: 'info'
     }
@@ -94,6 +116,13 @@ Ready to build something amazing? Just describe it! ✨`,
   const inputRef = useRef<HTMLInputElement>(null);
   const shellExecutor = ShellExecutor.getInstance();
 
+  // Poll for webhook events (only if GitHub is enabled)
+  const { events: webhookEvents } = useWebhookEvents({
+    enabled: githubEnabled,
+    pollInterval: 5000,
+    limit: 10,
+  });
+
   // Auto-scroll to bottom when new commands are added
   useEffect(() => {
     if (outputRef.current) {
@@ -116,8 +145,8 @@ Ready to build something amazing? Just describe it! ✨`,
     addCommand(
       'atlas thinking-mode',
       newMode
-        ? '✅ Thinking mode enabled - You will see detailed reasoning logs during code generation'
-        : '🔕 Thinking mode disabled - Only showing final results',
+        ? 'Thinking mode enabled - You will see detailed reasoning logs during code generation'
+        : 'Thinking mode disabled - Only showing final results',
       'info'
     );
   };
@@ -189,6 +218,56 @@ ${timestamp}
     };
   }, []);
 
+  // Stream webhook events into CLI
+  useEffect(() => {
+    if (webhookEvents.length === 0) return;
+
+    const latestEvent = webhookEvents[0];
+    const eventId = `webhook-${latestEvent.timestamp}`;
+
+    // Check if we've already logged this event
+    if (commands.find(cmd => cmd.id === eventId)) return;
+
+    let message = '';
+    let icon: 'push' | 'pr' | 'comment' | 'review' | 'check' | 'info' = 'info';
+
+    switch (latestEvent.type) {
+      case 'push':
+        icon = 'push';
+        message = `Push to ${latestEvent.data.ref} by ${latestEvent.data.sender?.login}`;
+        break;
+      case 'pull_request':
+        icon = 'pr';
+        message = `PR #${latestEvent.data.pull_request?.number} ${latestEvent.action} by ${latestEvent.data.sender?.login}`;
+        break;
+      case 'issue_comment':
+        icon = 'comment';
+        message = `Comment ${latestEvent.action} on #${latestEvent.data.issue?.number} by ${latestEvent.data.sender?.login}`;
+        break;
+      case 'pull_request_review_comment':
+        icon = 'review';
+        message = `Review comment ${latestEvent.action} on PR #${latestEvent.data.pull_request?.number} by ${latestEvent.data.sender?.login}`;
+        break;
+      case 'check_suite':
+      case 'check_run':
+        icon = 'check';
+        message = `Check ${latestEvent.action} in ${latestEvent.data.repository?.full_name}`;
+        break;
+    }
+
+    if (message) {
+      const cmd: CLICommand = {
+        id: eventId,
+        command: `[GitHub Webhook] ${latestEvent.type}`,
+        output: message,
+        timestamp: new Date(latestEvent.timestamp),
+        type: 'info',
+        icon
+      };
+      setCommands(prev => [...prev, cmd]);
+    }
+  }, [webhookEvents]);
+
   const loadEnvironmentInfo = async () => {
     try {
       const info = await shellExecutor.getEnvironmentInfo();
@@ -248,15 +327,15 @@ ${timestamp}
     if (generatedCode && !isGenerating) {
       // Backend will emit summary via streaming - no need to duplicate
       // Just show success message
-      addCommand('atlas generate "..."', `✅ Code generated successfully (${generatedCode.length} characters)`, 'success');
+      addCommand('atlas generate "..."', `Code generated successfully (${generatedCode.length} characters)`, 'success');
     }
   }, [generatedCode, isGenerating]);
 
   useEffect(() => {
     if (executionResult) {
       const output = executionResult.success
-        ? `✅ Tests passed: ${executionResult.output}`
-        : `⚠️ Tests failed: ${executionResult.output} (Code still generated - you can review and fix if needed)`;
+        ? `Tests passed: ${executionResult.output}`
+        : `Tests failed: ${executionResult.output} (Code still generated - you can review and fix if needed)`;
       addCommand('atlas test', output, executionResult.success ? 'success' : 'info');
     }
   }, [executionResult]);
@@ -314,7 +393,7 @@ ${timestamp}
         });
       }
 
-      addCommand(cmd, `❌ Error: ${error.message}`, 'error', executionTime);
+      addCommand(cmd, `Error: ${error.message}`, 'error', executionTime);
     } finally {
       setIsExecuting(false);
       setCurrentCommand('');
@@ -459,7 +538,7 @@ ${timestamp}
       case 'generate':
         const prompt = subArgs.join(' ');
         if (!prompt) {
-          addCommand('atlas generate', '❌ Error: Please provide a prompt. Example: atlas generate "Create a React todo app"', 'error');
+          addCommand('atlas generate', 'Error: Please provide a prompt. Example: atlas generate "Create a React todo app"', 'error');
           return;
         }
 
@@ -509,7 +588,7 @@ ${timestamp}
       case 'explain':
         const fileToExplain = subArgs[0];
         if (!fileToExplain) {
-          addCommand('atlas explain', '❌ Error: Please specify a file. Example: atlas explain @src/App.js', 'error');
+          addCommand('atlas explain', 'Error: Please specify a file. Example: atlas explain @src/App.js', 'error');
           return;
         }
         await onCommand(`Explain the code in ${fileToExplain}. What does this file do?`);
@@ -518,7 +597,7 @@ ${timestamp}
       case 'refactor':
         const fileToRefactor = subArgs[0];
         if (!fileToRefactor) {
-          addCommand('atlas refactor', '❌ Error: Please specify a file. Example: atlas refactor @src/App.js', 'error');
+          addCommand('atlas refactor', 'Error: Please specify a file. Example: atlas refactor @src/App.js', 'error');
           return;
         }
         await onCommand(`Refactor the code in ${fileToRefactor} to make it more readable and maintainable.`);
@@ -527,7 +606,7 @@ ${timestamp}
       case 'test':
         const fileToTest = subArgs[0];
         if (!fileToTest) {
-          addCommand('atlas test', '❌ Error: Please specify a file. Example: atlas test @src/App.js', 'error');
+          addCommand('atlas test', 'Error: Please specify a file. Example: atlas test @src/App.js', 'error');
           return;
         }
         await onCommand(`Add comprehensive unit tests for the code in ${fileToTest}.`);
@@ -536,7 +615,7 @@ ${timestamp}
       case 'optimize':
         const fileToOptimize = subArgs[0];
         if (!fileToOptimize) {
-          addCommand('atlas optimize', '❌ Error: Please specify a file. Example: atlas optimize @src/App.js', 'error');
+          addCommand('atlas optimize', 'Error: Please specify a file. Example: atlas optimize @src/App.js', 'error');
           return;
         }
         await onCommand(`Optimize the performance of the code in ${fileToOptimize}.`);
@@ -545,7 +624,7 @@ ${timestamp}
       case 'export':
         const platform = subArgs[0];
         if (!platform) {
-          addCommand('atlas export', '❌ Error: Please specify platform. Example: atlas export expo', 'error');
+          addCommand('atlas export', 'Error: Please specify platform. Example: atlas export expo', 'error');
           return;
         }
         if (platform === 'expo') {
@@ -555,7 +634,7 @@ ${timestamp}
           // Trigger flutter export
           window.dispatchEvent(new CustomEvent('atlas-export', { detail: 'flutter' }));
         } else {
-          addCommand('atlas export', `❌ Error: Unsupported platform "${platform}". Supported: expo, flutter`, 'error');
+          addCommand('atlas export', `Error: Unsupported platform "${platform}". Supported: expo, flutter`, 'error');
         }
         break;
 
@@ -567,7 +646,7 @@ ${timestamp}
       case 'restore':
         const restoreName = subArgs.join(' ');
         if (!restoreName) {
-          addCommand('atlas restore', '❌ Error: Please specify checkpoint name. Example: atlas restore "my-checkpoint"', 'error');
+          addCommand('atlas restore', 'Error: Please specify checkpoint name. Example: atlas restore "my-checkpoint"', 'error');
           return;
         }
         window.dispatchEvent(new CustomEvent('atlas-restore', { detail: restoreName }));
@@ -596,29 +675,29 @@ ${timestamp}
         break;
 
       default:
-        addCommand('atlas ' + subCommand, `❌ Unknown atlas command: ${subCommand}. Type "atlas help" for available commands.`, 'error');
+        addCommand('atlas ' + subCommand, `Unknown atlas command: ${subCommand}. Type "atlas help" for available commands.`, 'error');
     }
   };
 
   const getHelpText = () => {
     return `Atlas CLI - Local Autonomous Agent Interface
 
-🚀 Quick Start:
+Quick Start:
   Just type what you want to build and press Enter!
   All code generation uses REAL-TIME STREAMING by default!
 
-💡 Examples:
+Examples:
   "Create a React todo app"
   "Build a weather dashboard"
   "Make a chat component with emoji reactions"
   "Design a login form with validation"
   "Create a simple ping pong game"
 
-⚡ Code Generation (Streaming Enabled):
+Code Generation (Streaming Enabled):
   atlas generate <prompt>      Generate code from description
   <any prompt>                 Direct prompts also work!
 
-🔧 Shell Commands:
+Shell Commands:
   env                          Show environment information
   ls [directory]               List files and directories
   cat <file>                   Read and display file contents
@@ -627,39 +706,39 @@ ${timestamp}
   git [command]                Execute git commands
   shell <command>              Execute any shell command
 
-🧠 Thinking Mode:
+Thinking Mode:
   think / thinking             Toggle thinking mode on/off
-  Click the 🧠 button in the header to toggle verbose reasoning logs
+  Click the brain button in the header to toggle verbose reasoning logs
 
-🔧 Advanced Commands:
+Advanced Commands:
   Type /commands to see all available commands
 
-🎯 Tip: Code is generated line-by-line in real-time with proper formatting!
+Tip: Code is generated line-by-line in real-time with proper formatting!
 
-Ready to build something amazing? Just describe it! ✨`;
+Ready to build something amazing? Just describe it!`;
   };
 
   const getCommandsList = () => {
     return `Atlas CLI - All Available Commands
 
-🎯 Natural Language (Primary - Streaming Enabled):
+Natural Language (Primary - Streaming Enabled):
   <any prompt>                Generate code from natural language
   atlas generate <prompt>     Same as above (explicit)
 
-🔧 File Operations:
+File Operations:
   atlas explain <file>        Explain code in specified file
   atlas refactor <file>       Refactor code for better maintainability
   atlas test <file>           Generate tests for specified file
   atlas optimize <file>       Optimize code performance
 
-📦 Project Management:
+Project Management:
   atlas export <platform>     Export project (expo, flutter)
   atlas checkpoint <name>     Create project checkpoint
   atlas restore <name>        Restore from checkpoint
   atlas quality               Run code quality analysis
   atlas status                Show current project status
 
-💻 Local Shell Operations:
+Local Shell Operations:
   env                         Show environment information
   ls [directory]              List files and directories
   cat <file>                  Read and display file contents
@@ -668,19 +747,19 @@ Ready to build something amazing? Just describe it! ✨`;
   git [command]               Execute git commands (status, add, commit, etc.)
   shell <command>             Execute any shell command
 
-🛠️ Utility Commands:
+Utility Commands:
   atlas clear                 Clear terminal history
   atlas help                  Show quick start guide
   /commands                   Show this commands list
   think / thinking            Toggle thinking mode on/off
 
-🧠 Thinking Mode:
-  • Toggle with the 🧠 button in the header
+Thinking Mode:
+  • Toggle with the brain button in the header
   • Or use: atlas thinking, think, or thinking command
   • See detailed AI reasoning logs during code generation
   • Includes: Planning, Researching, Executing, Drafting, Summary
 
-💡 Pro Tips:
+Pro Tips:
   • All code generation uses real-time streaming by default
   • Use @filename to reference specific files
   • Be specific about frameworks and requirements
@@ -720,21 +799,21 @@ Environment: Local Execution`;
       }
 
       const info = environmentInfo || await shellExecutor.getEnvironmentInfo();
-      const envDisplay = `🖥️ Environment Information:
+      const envDisplay = `Environment Information:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌐 Platform: ${info.platform}
-📦 Node.js: ${info.nodeVersion}
-📋 NPM: ${info.npmVersion}
-🧶 Yarn: ${info.yarnVersion || 'Not installed'}
-🔧 Git: ${info.gitVersion || 'Not installed'}
-📁 Current Directory: ${info.currentDirectory}
-🛠️ Package Manager: ${info.packageManager.toUpperCase()}
+Platform: ${info.platform}
+Node.js: ${info.nodeVersion}
+NPM: ${info.npmVersion}
+Yarn: ${info.yarnVersion || 'Not installed'}
+Git: ${info.gitVersion || 'Not installed'}
+Current Directory: ${info.currentDirectory}
+Package Manager: ${info.packageManager.toUpperCase()}
 
-💡 Atlas can now execute local shell commands!
+Atlas can now execute local shell commands!
 Try: npm install, git status, ls, or any shell command`;
       addCommand('env', envDisplay, 'info');
     } catch (error: any) {
-      addCommand('env', `❌ Failed to get environment info: ${error.message}`, 'error');
+      addCommand('env', `Failed to get environment info: ${error.message}`, 'error');
     }
   };
 
@@ -759,19 +838,19 @@ Try: npm install, git status, ls, or any shell command`;
       const files = await shellExecutor.listDirectory(dirPath);
 
       if (files.length === 0) {
-        addCommand(`ls ${dirPath}`, `📁 Directory is empty`, 'info');
+        addCommand(`ls ${dirPath}`, `Directory is empty`, 'info');
       } else {
-        const fileList = files.map(file => `  📄 ${file}`).join('\n');
-        addCommand(`ls ${dirPath}`, `📁 Contents of ${dirPath}:\n${fileList}`, 'info');
+        const fileList = files.map(file => `  ${file}`).join('\n');
+        addCommand(`ls ${dirPath}`, `Contents of ${dirPath}:\n${fileList}`, 'info');
       }
     } catch (error: any) {
-      addCommand(`ls ${args.join(' ')}`, `❌ Failed to list directory: ${error.message}`, 'error');
+      addCommand(`ls ${args.join(' ')}`, `Failed to list directory: ${error.message}`, 'error');
     }
   };
 
   const executeReadFile = async (args: string[]) => {
     if (args.length === 0) {
-      addCommand('cat', '❌ Error: Please specify a file to read. Example: cat package.json', 'error');
+      addCommand('cat', 'Error: Please specify a file to read. Example: cat package.json', 'error');
       return;
     }
 
@@ -795,32 +874,32 @@ Try: npm install, git status, ls, or any shell command`;
       const content = await shellExecutor.readFile(filePath);
 
       if (content.length > 2000) {
-        addCommand(`cat ${filePath}`, `📄 File contents (truncated):\n${content.substring(0, 2000)}...\n\n💡 File is large (${content.length} chars). Showing first 2000 characters.`, 'info');
+        addCommand(`cat ${filePath}`, `File contents (truncated):\n${content.substring(0, 2000)}...\n\nFile is large (${content.length} chars). Showing first 2000 characters.`, 'info');
       } else {
-        addCommand(`cat ${filePath}`, `📄 Contents of ${filePath}:\n${content}`, 'info');
+        addCommand(`cat ${filePath}`, `Contents of ${filePath}:\n${content}`, 'info');
       }
     } catch (error: any) {
-      addCommand(`cat ${args.join(' ')}`, `❌ Failed to read file: ${error.message}`, 'error');
+      addCommand(`cat ${args.join(' ')}`, `Failed to read file: ${error.message}`, 'error');
     }
   };
 
   const executePackageScript = async (args: string[]) => {
     if (args.length === 0) {
-      addCommand('run', '❌ Error: Please specify a script to run. Example: run dev', 'error');
+      addCommand('run', 'Error: Please specify a script to run. Example: run dev', 'error');
       return;
     }
 
     try {
       const scriptName = args[0];
       updateCliActivity(true, `Running script: ${scriptName}`, 0);
-      addCommand(`run ${scriptName}`, `🚀 Executing script: ${scriptName}...`, 'info');
+      addCommand(`run ${scriptName}`, `Executing script: ${scriptName}...`, 'info', 'rocket');
 
       const result = await shellExecutor.runScript(scriptName);
 
       if (result.success) {
         updateCliActivity(false, undefined, 100);
         const modifiedFilesList = extractFilePaths(result.output);
-        addCommand(`run ${scriptName}`, `✅ Script completed successfully:\n${result.output}`, 'success');
+        addCommand(`run ${scriptName}`, `Script completed successfully:\n${result.output}`, 'success');
 
         // Track any file modifications
         modifiedFilesList.forEach(filePath => {
@@ -828,17 +907,17 @@ Try: npm install, git status, ls, or any shell command`;
         });
       } else {
         updateCliActivity(false);
-        addCommand(`run ${scriptName}`, `❌ Script failed:\n${result.error || result.output}`, 'error');
+        addCommand(`run ${scriptName}`, `Script failed:\n${result.error || result.output}`, 'error');
       }
     } catch (error: any) {
       updateCliActivity(false);
-      addCommand(`run ${args.join(' ')}`, `❌ Failed to execute script: ${error.message}`, 'error');
+      addCommand(`run ${args.join(' ')}`, `Failed to execute script: ${error.message}`, 'error');
     }
   };
 
   const executePackageInstall = async (args: string[]) => {
     if (args.length === 0) {
-      addCommand('install', '❌ Error: Please specify packages to install. Example: install react typescript', 'error');
+      addCommand('install', 'Error: Please specify packages to install. Example: install react typescript', 'error');
       return;
     }
 
@@ -881,7 +960,7 @@ Try: npm install, git status, ls, or any shell command`;
           });
         }
 
-        addCommand(`install ${packages.join(' ')}`, `✅ Packages installed successfully:\n${result.output}`, 'success');
+        addCommand(`install ${packages.join(' ')}`, `Packages installed successfully:\n${result.output}`, 'success');
 
         // Track package.json and lock file modifications
         trackFileModification('package.json', 'package installation');
@@ -908,7 +987,7 @@ Try: npm install, git status, ls, or any shell command`;
           });
         }
 
-        addCommand(`install ${packages.join(' ')}`, `❌ Package installation failed:\n${result.error || result.output}`, 'error');
+        addCommand(`install ${packages.join(' ')}`, `Package installation failed:\n${result.error || result.output}`, 'error');
       }
     } catch (error: any) {
       updateCliActivity(false);
@@ -923,7 +1002,7 @@ Try: npm install, git status, ls, or any shell command`;
         });
       }
 
-      addCommand(`install ${args.join(' ')}`, `❌ Failed to install packages: ${error.message}`, 'error');
+      addCommand(`install ${args.join(' ')}`, `Failed to install packages: ${error.message}`, 'error');
     }
   };
 
@@ -933,22 +1012,22 @@ Try: npm install, git status, ls, or any shell command`;
       try {
         const isGitRepo = await shellExecutor.isGitRepository();
         if (!isGitRepo) {
-          addCommand('git', '❌ Not a git repository', 'error');
+          addCommand('git', 'Not a git repository', 'error');
           return;
         }
 
         const statusResult = await shellExecutor.getGitStatus();
         if (statusResult.success) {
           if (statusResult.output.trim() === '') {
-            addCommand('git status', '✅ Working directory clean', 'success');
+            addCommand('git status', 'Working directory clean', 'success');
           } else {
-            addCommand('git status', `📊 Git status:\n${statusResult.output}`, 'info');
+            addCommand('git status', `Git status:\n${statusResult.output}`, 'info');
           }
         } else {
-          addCommand('git status', `❌ Failed to get git status: ${statusResult.error}`, 'error');
+          addCommand('git status', `Failed to get git status: ${statusResult.error}`, 'error');
         }
       } catch (error: any) {
-        addCommand('git', `❌ Git command failed: ${error.message}`, 'error');
+        addCommand('git', `Git command failed: ${error.message}`, 'error');
       }
       return;
     }
@@ -958,18 +1037,18 @@ Try: npm install, git status, ls, or any shell command`;
       const result = await shellExecutor.executeCommand(`git ${gitCmd}`);
 
       if (result.success) {
-        addCommand(`git ${gitCmd}`, `✅ Git command completed:\n${result.output}`, 'success');
+        addCommand(`git ${gitCmd}`, `Git command completed:\n${result.output}`, 'success');
       } else {
-        addCommand(`git ${gitCmd}`, `❌ Git command failed:\n${result.error || result.output}`, 'error');
+        addCommand(`git ${gitCmd}`, `Git command failed:\n${result.error || result.output}`, 'error');
       }
     } catch (error: any) {
-      addCommand(`git ${args.join(' ')}`, `❌ Git command failed: ${error.message}`, 'error');
+      addCommand(`git ${args.join(' ')}`, `Git command failed: ${error.message}`, 'error');
     }
   };
 
   const executeShellCommand = async (args: string[]) => {
     if (args.length === 0) {
-      addCommand('shell', '❌ Error: Please specify a shell command to execute. Example: shell npm --version', 'error');
+      addCommand('shell', 'Error: Please specify a shell command to execute. Example: shell npm --version', 'error');
       return;
     }
 
@@ -1012,7 +1091,7 @@ Try: npm install, git status, ls, or any shell command`;
           });
         }
 
-        addCommand(`shell ${command}`, `✅ Command completed (${result.executionTime}ms):\n${result.output}`, 'success');
+        addCommand(`shell ${command}`, `Command completed (${result.executionTime}ms):\n${result.output}`, 'success');
 
         // Track any file modifications
         modifiedFilesList.forEach(filePath => {
@@ -1031,7 +1110,7 @@ Try: npm install, git status, ls, or any shell command`;
           });
         }
 
-        addCommand(`shell ${command}`, `❌ Command failed (${result.executionTime}ms):\n${result.error || result.output}`, 'error');
+        addCommand(`shell ${command}`, `Command failed (${result.executionTime}ms):\n${result.error || result.output}`, 'error');
       }
     } catch (error: any) {
       updateCliActivity(false);
@@ -1046,7 +1125,7 @@ Try: npm install, git status, ls, or any shell command`;
         });
       }
 
-      addCommand(`shell ${args.join(' ')}`, `❌ Shell execution failed: ${error.message}`, 'error');
+      addCommand(`shell ${args.join(' ')}`, `Shell execution failed: ${error.message}`, 'error');
     }
   };
 
@@ -1100,10 +1179,10 @@ Try: npm install, git status, ls, or any shell command`;
   const getTypeIcon = (type: CLICommand['type']) => {
     switch (type) {
       case 'command': return '$';
-      case 'response': return '🤖';
-      case 'error': return '❌';
-      case 'success': return '✅';
-      case 'info': return 'ℹ️';
+      case 'response': return '>';
+      case 'error': return '!';
+      case 'success': return '✓';
+      case 'info': return 'i';
       default: return '>';
     }
   };
@@ -1117,6 +1196,53 @@ Try: npm install, git status, ls, or any shell command`;
       case 'info': return 'text-cyan-400';
       default: return 'text-gray-400';
     }
+  };
+
+  const renderIcon = (icon?: string, type?: CLICommand['type']) => {
+    const iconClass = "w-4 h-4 flex-shrink-0";
+
+    if (icon) {
+      switch (icon) {
+        case 'push':
+          return <ArrowUpCircle className={`${iconClass} text-purple-400`} />;
+        case 'pr':
+          return <GitPullRequest className={`${iconClass} text-blue-400`} />;
+        case 'comment':
+          return <MessageSquare className={`${iconClass} text-green-400`} />;
+        case 'review':
+          return <FileEdit className={`${iconClass} text-yellow-400`} />;
+        case 'check':
+          return <CheckCircle2 className={`${iconClass} text-green-400`} />;
+        case 'info':
+          return <Info className={`${iconClass} text-cyan-400`} />;
+        case 'rocket':
+          return <Rocket className={`${iconClass} text-orange-400`} />;
+        case 'lightbulb':
+          return <Lightbulb className={`${iconClass} text-yellow-400`} />;
+        case 'folder':
+          return <Folder className={`${iconClass} text-blue-400`} />;
+        default:
+          return null;
+      }
+    }
+
+    // Fallback based on type
+    if (type) {
+      switch (type) {
+        case 'error':
+          return <XCircle className={`${iconClass} text-red-400`} />;
+        case 'success':
+          return <CheckCircle2 className={`${iconClass} text-green-400`} />;
+        case 'info':
+          return <Info className={`${iconClass} text-cyan-400`} />;
+        case 'command':
+          return <Terminal className={`${iconClass} text-green-400`} />;
+        default:
+          return null;
+      }
+    }
+
+    return null;
   };
 
   const activityDotClass = [
@@ -1205,8 +1331,11 @@ Try: npm install, git status, ls, or any shell command`;
 
               {cmd.output && (
                 <div className={['ml-4 pl-4 border-l-2', getTypeColor(cmd.type)].join(' ')}>
-                  <div className="text-[var(--muted)] whitespace-pre-wrap leading-relaxed">
-                    {cmd.output}
+                  <div className="flex items-start gap-2">
+                    {renderIcon(cmd.icon, cmd.type)}
+                    <div className="text-[var(--muted)] whitespace-pre-wrap leading-relaxed flex-1">
+                      {cmd.output}
+                    </div>
                   </div>
                   {cmd.executionTime && (
                     <div className="text-[var(--size-small)] text-[var(--muted)] mt-1">

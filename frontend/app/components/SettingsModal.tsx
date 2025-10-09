@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Server, Cpu, GitBranch } from 'lucide-react';
+import { X, Server, Cpu, GitBranch, Github } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 type SettingsModalProps = {
@@ -9,9 +9,11 @@ type SettingsModalProps = {
   activeProvider: string;
   selectedModel: string;
   allowFailover: boolean;
+  githubEnabled: boolean;
   onProviderChange: (provider: string) => void;
   onModelChange: (model: string) => void;
   onFailoverChange: (enabled: boolean) => void;
+  onGitHubEnabledChange: (enabled: boolean) => void;
 };
 
 const providerOptions = [
@@ -56,19 +58,23 @@ export default function SettingsModal({
   activeProvider,
   selectedModel,
   allowFailover,
+  githubEnabled,
   onProviderChange,
   onModelChange,
-  onFailoverChange
+  onFailoverChange,
+  onGitHubEnabledChange
 }: SettingsModalProps) {
   const [localProvider, setLocalProvider] = useState(activeProvider);
   const [localModel, setLocalModel] = useState(selectedModel);
   const [localFailover, setLocalFailover] = useState(allowFailover);
+  const [localGitHubEnabled, setLocalGitHubEnabled] = useState(githubEnabled);
 
   useEffect(() => {
     setLocalProvider(activeProvider);
     setLocalModel(selectedModel);
     setLocalFailover(allowFailover);
-  }, [activeProvider, selectedModel, allowFailover, isOpen]);
+    setLocalGitHubEnabled(githubEnabled);
+  }, [activeProvider, selectedModel, allowFailover, githubEnabled, isOpen]);
 
   const handleProviderChange = (provider: string) => {
     setLocalProvider(provider);
@@ -83,6 +89,7 @@ export default function SettingsModal({
     onProviderChange(localProvider);
     onModelChange(localModel);
     onFailoverChange(localFailover);
+    onGitHubEnabledChange(localGitHubEnabled);
     onClose();
   };
 
@@ -162,6 +169,24 @@ export default function SettingsModal({
             </button>
             <p className="text-[var(--size-small)] text-[var(--muted)]">
               Automatically switch to backup provider if primary fails
+            </p>
+          </div>
+
+          {/* GitHub Integration Toggle */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-[var(--size-body)] font-medium text-[var(--text)]">
+              <Github className="icon" />
+              GitHub Integration
+            </label>
+            <button
+              onClick={() => setLocalGitHubEnabled(!localGitHubEnabled)}
+              className={`chip ${localGitHubEnabled ? 'on' : 'off'}`}
+              type="button"
+            >
+              {localGitHubEnabled ? 'Enabled' : 'Disabled'}
+            </button>
+            <p className="text-[var(--size-small)] text-[var(--muted)]">
+              Enable GitHub OAuth, App integration, and webhooks. Disable this for local development or testing.
             </p>
           </div>
         </div>

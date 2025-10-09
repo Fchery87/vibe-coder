@@ -1,0 +1,6 @@
+# Add these dependencies to frontend/package.json:
+# Run: cd frontend && npm install @octokit/rest @octokit/auth-app iron-session
+
+"@octokit/rest": "^20.0.2",
+"@octokit/auth-app": "^6.0.3",
+"iron-session": "^8.0.1"

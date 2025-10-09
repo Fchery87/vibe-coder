@@ -1,10 +1,11 @@
 'use client';
 
-import { Sparkles, Brain, Server, Cpu, GitPullRequest, Save, Share2, Settings, Activity } from "lucide-react";
+import { Sparkles, Brain, GitPullRequest, Save, Share2, Settings, Activity } from "lucide-react";
+import GitHubConnect from "./GitHubConnect";
+import RepoPicker from "./RepoPicker";
+import { GitHubRepository } from "@/lib/github-types";
 
 type Props = {
-  provider: string;
-  model: string;
   streaming: boolean;
   thinking: boolean;
   streamingFileCount?: number;
@@ -17,17 +18,18 @@ type Props = {
   metrics?: { chars?: number; logs?: number; checkpoints?: number; cliFiles?: number };
   onToggleStreaming?: () => void;
   onToggleThinking?: () => void;
-  onChangeProvider?: () => void;
-  onChangeModel?: () => void;
   onSave?: () => void;
   onPR?: () => void;
   onShare?: () => void;
   onSettings?: () => void;
+  onRepoSelect?: (repo: GitHubRepository, installationId: number) => void;
+  githubConnected?: boolean;
+  githubEnabled?: boolean;
+  onGitHubConnect?: () => void;
+  onGitHubDisconnect?: () => void;
 };
 
 export default function HeaderBar({
-  provider,
-  model,
   streaming,
   thinking,
   streamingFileCount = 0,
@@ -37,12 +39,15 @@ export default function HeaderBar({
   metrics = { chars: 0, logs: 0, checkpoints: 0, cliFiles: 0 },
   onToggleStreaming,
   onToggleThinking,
-  onChangeProvider,
-  onChangeModel,
   onSave,
   onPR,
   onShare,
-  onSettings
+  onSettings,
+  onRepoSelect,
+  githubConnected = false,
+  githubEnabled = false,
+  onGitHubConnect,
+  onGitHubDisconnect,
 }: Props) {
   return (
     <header className="topbar">
@@ -59,7 +64,7 @@ export default function HeaderBar({
       <div className="cluster">
         <button className={`chip ${streaming ? "on" : "off"}`} onClick={onToggleStreaming} type="button">
           <Sparkles className="icon" />
-          <span>Streaming Mode</span>
+          <span>Streaming</span>
           {streaming && (
             <span className="streaming-dots">
               <span></span>
@@ -69,21 +74,13 @@ export default function HeaderBar({
           )}
           {streamingFileCount > 0 && (
             <span className="text-[var(--accent-2)] text-[var(--size-small)] font-semibold ml-2">
-              {completedStreamingFiles}/{streamingFileCount} files
+              {completedStreamingFiles}/{streamingFileCount}
             </span>
           )}
         </button>
         <button className={`chip ${thinking ? "on" : "off"}`} onClick={onToggleThinking} type="button">
           <Brain className="icon" />
-          <span>Thinking Mode</span>
-        </button>
-        <button className="chip" onClick={onChangeProvider} type="button">
-          <Server className="icon" />
-          <span>{provider || 'Select Provider'}</span>
-        </button>
-        <button className="chip" onClick={onChangeModel} type="button">
-          <Cpu className="icon" />
-          <span>{model || 'Select Model'}</span>
+          <span>Thinking</span>
         </button>
         {cliActivity?.isActive && (
           <span className="chip on">
@@ -93,8 +90,16 @@ export default function HeaderBar({
         )}
       </div>
 
-      {/* Right: Actions + Metrics */}
+      {/* Right: GitHub + Actions + Metrics */}
       <div className="cluster">
+        {githubEnabled && (
+          <>
+            <GitHubConnect onConnect={onGitHubConnect} onDisconnect={onGitHubDisconnect} />
+            {githubConnected && onRepoSelect && (
+              <RepoPicker onRepoSelect={onRepoSelect} isConnected={githubConnected} />
+            )}
+          </>
+        )}
         <button className="btn" onClick={onSave} type="button">
           <Save className="icon" />
           <span>Save</span>
