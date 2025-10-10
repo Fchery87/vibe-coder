@@ -12,7 +12,8 @@
       "Bash(cmd //c:*)",
       "Bash(tasklist)",
       "Bash(timeout 30 npm run dev)",
-      "WebSearch"
+      "WebSearch",
+      "Read(//e/Dev/vibe-coder/frontend/app/api/generate/**)"
     ],
     "deny": [],
     "ask": []

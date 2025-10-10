@@ -16,6 +16,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import HeaderBar from "@/components/HeaderBar";
 import SettingsModal from "@/components/SettingsModal";
 import { GitHubRepository, WorkspaceState } from "@/lib/github-types";
+import TabBar from "@/components/TabBar";
+import { useTabs } from "@/hooks/useTabs";
 
 interface ProjectSnapshot {
   id: string;
@@ -35,6 +37,7 @@ interface ChatMessage {
 
 export default function Home() {
   const { toasts, addToast, removeToast } = useToast();
+  const { tabs, activeTabId, activeTab: activeFileTab, openTab, closeTab, selectTab, updateTabContent } = useTabs();
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [originalGeneratedCode, setOriginalGeneratedCode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -81,8 +84,6 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [checkpoints, setCheckpoints] = useState<ProjectSnapshot[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<{ path: string; content: string; name: string } | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [cliModifiedFiles, setCliModifiedFiles] = useState<Set<string>>(new Set());
   const [cliActivity, setCliActivity] = useState<{
@@ -600,29 +601,21 @@ export default function Home() {
     try {
       // For demo purposes, we'll load the index.html file content
       // In a real app, you'd make an API call to read the file
+      let content: string;
+      let fileName = filePath.split('/').pop() || filePath;
+
       if (filePath === 'public/index.html') {
         const response = await fetch('/index.html');
-        const content = await response.text();
-        setSelectedFile({
-          path: filePath,
-          content: content,
-          name: 'index.html'
-        });
-        setFileContent(content);
-        setActiveTab('editor');
-        addToast(`Opened ${filePath}`, 'success');
+        content = await response.text();
       } else {
         // For other files, show a placeholder
-        const placeholderContent = `// File: ${filePath}\n// This is a placeholder for ${filePath}\n// In a real implementation, this would load the actual file content\n\nconsole.log('Hello from ${filePath}');`;
-        setSelectedFile({
-          path: filePath,
-          content: placeholderContent,
-          name: filePath.split('/').pop() || filePath
-        });
-        setFileContent(placeholderContent);
-        setActiveTab('editor');
-        addToast(`Opened ${filePath}`, 'success');
+        content = `// File: ${filePath}\n// This is a placeholder for ${filePath}\n// In a real implementation, this would load the actual file content\n\nconsole.log('Hello from ${filePath}');`;
       }
+
+      // Open file in a new tab (or switch to existing tab)
+      openTab(filePath, content, fileName);
+      setActiveTab('editor');
+      addToast(`Opened ${filePath}`, 'success');
     } catch (error) {
       console.error('Error loading file:', error);
       addToast(`Failed to load ${filePath}`, 'error');
@@ -821,13 +814,40 @@ export default function Home() {
             e.preventDefault();
             setChatMessages([]);
             break;
+          case 'w':
+            // Close active tab (Cmd/Ctrl+W)
+            e.preventDefault();
+            if (activeTabId) {
+              closeTab(activeTabId);
+            }
+            break;
+          case 'Tab':
+            // Switch between tabs (Cmd/Ctrl+Tab)
+            e.preventDefault();
+            if (tabs.length > 0) {
+              const currentIndex = tabs.findIndex(tab => tab.id === activeTabId);
+              const nextIndex = e.shiftKey
+                ? (currentIndex - 1 + tabs.length) % tabs.length  // Shift+Tab goes backward
+                : (currentIndex + 1) % tabs.length;  // Tab goes forward
+              selectTab(tabs[nextIndex].id);
+            }
+            break;
+        }
+      }
+
+      // Cmd/Ctrl+1-9 to switch to specific tab
+      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        const tabIndex = parseInt(e.key) - 1;
+        if (tabs[tabIndex]) {
+          selectTab(tabs[tabIndex].id);
         }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [tabs, activeTabId, closeTab, selectTab]);
 
 
   return (
@@ -1286,7 +1306,7 @@ export default function Home() {
                 </div>
 
                 {/* Editor Tab Content */}
-                <TabsContent value="editor" className="flex-1 min-h-0 m-0">
+                <TabsContent value="editor" className="flex-1 min-h-0 m-0 flex flex-col">
                   {isStreamingMode ? (
                     <StreamingEditor
                       onStreamingComplete={handleStreamingComplete}
@@ -1295,11 +1315,37 @@ export default function Home() {
                       onExitStreaming={() => setIsStreamingMode(false)}
                     />
                   ) : (
-                    <CodeEditor
-                      value={isGenerating && !generatedCode ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!" : generatedCode}
-                      onChange={(val) => val !== undefined && setGeneratedCode(val)}
-                      originalValue={originalGeneratedCode}
-                    />
+                    <>
+                      {/* Tab Bar for open files */}
+                      <TabBar
+                        tabs={tabs}
+                        activeTabId={activeTabId}
+                        onTabSelect={selectTab}
+                        onTabClose={closeTab}
+                      />
+
+                      {/* Code Editor */}
+                      <div className="flex-1 min-h-0">
+                        <CodeEditor
+                          value={
+                            activeFileTab?.content ||
+                            (isGenerating && !generatedCode
+                              ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!"
+                              : generatedCode || "// No file open. Select a file from the tree or generate code.")
+                          }
+                          onChange={(val) => {
+                            if (val !== undefined) {
+                              if (activeTabId) {
+                                updateTabContent(activeTabId, val);
+                              } else {
+                                setGeneratedCode(val);
+                              }
+                            }
+                          }}
+                          originalValue={activeFileTab?.content || originalGeneratedCode}
+                        />
+                      </div>
+                    </>
                   )}
                 </TabsContent>
 
@@ -1315,38 +1361,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Code Editor - Only show when file is selected */}
-          {selectedFile && (
-            <div className="border-t border-[var(--border)]">
-              {/* Editor Header */}
-              <div className="p-3 border-b border-[var(--border)] bg-[var(--panel-alt)] flex items-center justify-between flex-shrink-0">
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {selectedFile.name}
-                </h2>
-                <button
-                  onClick={() => setSelectedFile(null)}
-                  className="p-1 hover:bg-[rgba(51,65,85,0.5)] rounded transition-colors text-[var(--muted)] hover:text-white"
-                  title="Close Editor"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Editor Content */}
-              <div className="h-64 lg:h-80">
-                <CodeEditor
-                  value={fileContent}
-                  onChange={(val) => setFileContent(val || '')}
-                  originalValue={selectedFile.content}
-                />
-              </div>
-            </div>
-          )}
 
           {/* Terminal/Console with Status Feedback */}
           <div className="h-32 md:h-40 glass-panel border-t border-white/10 bg-slate-900 transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col">
