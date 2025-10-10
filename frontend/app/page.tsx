@@ -18,6 +18,8 @@ import SettingsModal from "@/components/SettingsModal";
 import { GitHubRepository, WorkspaceState } from "@/lib/github-types";
 import TabBar from "@/components/TabBar";
 import { useTabs } from "@/hooks/useTabs";
+import NotificationCenter from "@/components/NotificationCenter";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface ProjectSnapshot {
   id: string;
@@ -38,6 +40,15 @@ interface ChatMessage {
 export default function Home() {
   const { toasts, addToast, removeToast } = useToast();
   const { tabs, activeTabId, activeTab: activeFileTab, openTab, closeTab, selectTab, updateTabContent } = useTabs();
+  const {
+    notifications,
+    unreadCount,
+    addNotification,
+    markAsRead,
+    markAllAsRead,
+    clearAll,
+    removeNotification
+  } = useNotifications();
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [originalGeneratedCode, setOriginalGeneratedCode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -85,6 +96,7 @@ export default function Home() {
   const [checkpoints, setCheckpoints] = useState<ProjectSnapshot[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [cliModifiedFiles, setCliModifiedFiles] = useState<Set<string>>(new Set());
   const [cliActivity, setCliActivity] = useState<{
     isActive: boolean;
@@ -575,6 +587,7 @@ export default function Home() {
     switch (commandId) {
       case 'generate':
         // Focus on prompt input
+        setActiveTab('chat');
         break;
       case 'checkpoint':
         createCheckpoint(`Checkpoint ${new Date().toLocaleTimeString()}`, 'Auto-generated checkpoint');
@@ -590,9 +603,15 @@ export default function Home() {
         break;
       case 'clear-chat':
         setChatMessages([]);
+        addToast('Chat history cleared', 'success');
         break;
       case 'toggle-theme':
-        // Theme toggle logic would go here
+        // Toggle theme by dispatching click on theme toggle button
+        const themeToggle = document.querySelector('[data-theme-toggle]') as HTMLElement;
+        themeToggle?.click();
+        break;
+      case 'open-settings':
+        setIsSettingsOpen(true);
         break;
     }
   };
@@ -639,7 +658,25 @@ export default function Home() {
 
   const handleCliFileModified = (filePath: string, operation: string) => {
     setCliModifiedFiles(prev => new Set([...prev, filePath]));
-    addToast(`CLI ${operation}: ${filePath}`, 'info');
+
+    // Add actionable notification
+    addNotification(
+      `File ${operation}: ${filePath}`,
+      'info',
+      [
+        {
+          label: 'Open File',
+          onClick: () => handleFileSelection(filePath),
+          variant: 'primary'
+        },
+        {
+          label: 'View in Tree',
+          onClick: () => setIsSidebarCollapsed(false),
+          variant: 'secondary'
+        }
+      ],
+      { filePath, operation }
+    );
 
     // Auto-refresh file tree to show changes
     // You could also trigger a file tree refresh here
@@ -877,6 +914,8 @@ export default function Home() {
         onGitHubConnect={handleGitHubConnect}
         onGitHubDisconnect={handleGitHubDisconnect}
         onRepoSelect={handleRepoSelect}
+        unreadNotifications={unreadCount}
+        onNotificationsClick={() => setIsNotificationCenterOpen(true)}
       />
 
       {/* Old header backup - keeping for reference */}
@@ -1427,6 +1466,9 @@ export default function Home() {
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         onCommand={handleCommand}
+        openTabs={tabs}
+        onTabSelect={selectTab}
+        onFileOpen={handleFileSelection}
       />
 
       {/* Settings Modal */}
@@ -1451,6 +1493,18 @@ export default function Home() {
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* Notification Center */}
+      <NotificationCenter
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
+        onClearAll={clearAll}
+        onRemove={removeNotification}
+      />
 
       {/* Theme Toggle - Floating */}
       <div className="fixed bottom-4 right-4 z-40">

@@ -2,28 +2,37 @@
 
 import { useEffect, useState } from 'react';
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary' | 'danger';
+}
+
 interface ToastProps {
   message: string;
   type: 'success' | 'error' | 'info' | 'warning';
   onClose: () => void;
   duration?: number;
+  actions?: ToastAction[];
 }
 
-export default function Toast({ message, type, onClose, duration = 4000 }: ToastProps) {
+export default function Toast({ message, type, onClose, duration = 4000, actions }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     // Trigger animation
     setIsVisible(true);
 
-    // Auto close after duration
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(onClose, 300); // Wait for animation to complete
-    }, duration);
+    // Auto close after duration (unless there are actions - let user dismiss manually)
+    if (!actions || actions.length === 0) {
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+        setTimeout(onClose, 300); // Wait for animation to complete
+      }, duration);
 
-    return () => clearTimeout(timer);
-  }, [duration, onClose]);
+      return () => clearTimeout(timer);
+    }
+  }, [duration, onClose, actions]);
 
   const getToastStyles = () => {
     switch (type) {
@@ -77,20 +86,49 @@ export default function Toast({ message, type, onClose, duration = 4000 }: Toast
         </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="mt-3 bg-black/20 rounded-full h-1 overflow-hidden">
-        <div
-          className={`h-full transition-all ease-linear ${
-            type === 'success' ? 'bg-green-400' :
-            type === 'error' ? 'bg-red-400' :
-            type === 'warning' ? 'bg-yellow-400' :
-            'bg-blue-400'
-          }`}
-          style={{
-            animation: `shrink ${duration}ms linear forwards`
-          }}
-        />
-      </div>
+      {/* Action buttons */}
+      {actions && actions.length > 0 && (
+        <div className="mt-3 flex items-center gap-2">
+          {actions.map((action, index) => {
+            const buttonStyles = action.variant === 'primary'
+              ? 'bg-purple-600 hover:bg-purple-700 text-white'
+              : action.variant === 'danger'
+              ? 'bg-red-600 hover:bg-red-700 text-white'
+              : 'bg-slate-700 hover:bg-slate-600 text-gray-200';
+
+            return (
+              <button
+                key={index}
+                onClick={() => {
+                  action.onClick();
+                  setIsVisible(false);
+                  setTimeout(onClose, 300);
+                }}
+                className={`px-3 py-1 text-xs rounded transition-colors ${buttonStyles}`}
+              >
+                {action.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Progress bar (only for non-actionable toasts) */}
+      {(!actions || actions.length === 0) && (
+        <div className="mt-3 bg-black/20 rounded-full h-1 overflow-hidden">
+          <div
+            className={`h-full transition-all ease-linear ${
+              type === 'success' ? 'bg-green-400' :
+              type === 'error' ? 'bg-red-400' :
+              type === 'warning' ? 'bg-yellow-400' :
+              'bg-blue-400'
+            }`}
+            style={{
+              animation: `shrink ${duration}ms linear forwards`
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -101,6 +139,7 @@ interface ToastContainerProps {
     id: string;
     message: string;
     type: 'success' | 'error' | 'info' | 'warning';
+    actions?: ToastAction[];
   }>;
   onRemove: (id: string) => void;
 }
@@ -114,6 +153,7 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
           message={toast.message}
           type={toast.type}
           onClose={() => onRemove(toast.id)}
+          actions={toast.actions}
         />
       ))}
     </div>

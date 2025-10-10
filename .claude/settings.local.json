@@ -13,7 +13,9 @@
       "Bash(tasklist)",
       "Bash(timeout 30 npm run dev)",
       "WebSearch",
-      "Read(//e/Dev/vibe-coder/frontend/app/api/generate/**)"
+      "Read(//e/Dev/vibe-coder/frontend/app/api/generate/**)",
+      "Bash(npm install:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

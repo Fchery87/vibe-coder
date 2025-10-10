@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkles, Brain, GitPullRequest, Save, Share2, Settings, Activity } from "lucide-react";
+import { Sparkles, Brain, GitPullRequest, Save, Share2, Settings, Activity, Bell } from "lucide-react";
 import GitHubConnect from "./GitHubConnect";
 import RepoPicker from "./RepoPicker";
 import { GitHubRepository } from "@/lib/github-types";
@@ -27,6 +27,8 @@ type Props = {
   githubEnabled?: boolean;
   onGitHubConnect?: () => void;
   onGitHubDisconnect?: () => void;
+  unreadNotifications?: number;
+  onNotificationsClick?: () => void;
 };
 
 export default function HeaderBar({
@@ -48,6 +50,8 @@ export default function HeaderBar({
   githubEnabled = false,
   onGitHubConnect,
   onGitHubDisconnect,
+  unreadNotifications = 0,
+  onNotificationsClick,
 }: Props) {
   return (
     <header className="topbar">
@@ -126,6 +130,19 @@ export default function HeaderBar({
             </>
           )}
         </div>
+        <button
+          className="btn relative"
+          onClick={onNotificationsClick}
+          type="button"
+          title="Notifications"
+        >
+          <Bell className="icon" />
+          {unreadNotifications > 0 && (
+            <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              {unreadNotifications > 99 ? '99+' : unreadNotifications}
+            </span>
+          )}
+        </button>
         <button className="btn" onClick={onSettings} type="button">
           <Settings className="icon" />
         </button>
