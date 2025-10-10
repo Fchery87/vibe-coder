@@ -636,3 +636,185 @@ kbd {
   margin: 4px 0;
 }
 
+/* Phase 2: Micro-interactions & Polish */
+
+/* Smooth button hover effects */
+.btn, button[class*="btn"] {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:hover, button[class*="btn"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+}
+
+.btn:active, button[class*="btn"]:active {
+  transform: translateY(0);
+}
+
+/* Ripple effect for clicks */
+.btn::before, button[class*="btn"]::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+}
+
+.btn:active::before, button[class*="btn"]:active::before {
+  width: 100px;
+  height: 100px;
+}
+
+/* Smooth expand/collapse animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.slide-down {
+  animation: slideDown 0.2s ease-out;
+}
+
+.slide-up {
+  animation: slideUp 0.2s ease-out;
+}
+
+/* Smooth fade animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.fade-out {
+  animation: fadeOut 0.3s ease-out;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  border: 2px solid rgba(124, 58, 237, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin 0.6s linear infinite;
+}
+
+.spinner-lg {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+/* Pulse animation for active indicators */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Shimmer loading effect for skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-pulse {
+  background: linear-gradient(
+    90deg,
+    var(--panel-alt) 0%,
+    rgba(148, 163, 184, 0.1) 50%,
+    var(--panel-alt) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Smooth scale transitions */
+.scale-on-hover {
+  transition: transform 0.2s ease-out;
+}
+
+.scale-on-hover:hover {
+  transform: scale(1.05);
+}
+
+/* Smooth opacity transitions */
+.opacity-transition {
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Glow effect for focused elements */
+.glow-on-focus:focus {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
+  outline: none;
+}
+
+/* Smooth border color transitions */
+.border-transition {
+  transition: border-color 0.2s ease-in-out;
+}
+
+/* Smooth background transitions */
+.bg-transition {
+  transition: background-color 0.2s ease-in-out;
+}
+
+/* Smooth text color transitions */
+.text-transition {
+  transition: color 0.2s ease-in-out;
+}
+
+/* Smooth all transitions */
+.smooth-transition {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+

@@ -86,3 +86,42 @@ export function PreviewSkeleton() {
     </div>
   );
 }
+
+export function FileTreeSkeleton() {
+  return (
+    <div className="space-y-2 p-4">
+      {[...Array(8)].map((_, i) => (
+        <div key={i} className="flex items-center gap-2" style={{ paddingLeft: `${(i % 3) * 16}px` }}>
+          <Skeleton variant="circular" width={16} height={16} />
+          <Skeleton variant="text" width={`${60 + (i * 10) % 40}%`} height={16} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function EditorSkeleton() {
+  return (
+    <div className="h-full flex flex-col bg-[var(--panel)]">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+        <Skeleton variant="text" width={120} height={20} />
+        <div className="flex gap-2">
+          <Skeleton variant="rectangular" width={60} height={24} />
+          <Skeleton variant="rectangular" width={80} height={24} />
+        </div>
+      </div>
+      {/* Code lines */}
+      <div className="flex-1 p-4 space-y-2">
+        {[...Array(15)].map((_, i) => (
+          <Skeleton
+            key={i}
+            variant="rectangular"
+            width={`${40 + (i * 13) % 60}%`}
+            height={14}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
