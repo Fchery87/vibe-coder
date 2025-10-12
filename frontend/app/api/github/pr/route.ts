@@ -45,9 +45,18 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Failed to create PR:", error);
+
+    // Handle specific errors gracefully
+    if (error.status === 422) {
+      return NextResponse.json(
+        { error: true, message: 'Pull request already exists or no changes to merge' },
+        { status: 200 }
+      );
+    }
+
     return NextResponse.json(
-      { error: error.message || "Failed to create pull request" },
-      { status: 500 }
+      { error: true, message: error.message || "Failed to create pull request" },
+      { status: 200 }
     );
   }
 }
@@ -93,8 +102,8 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error("Failed to fetch PR:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch pull request" },
-      { status: 500 }
+      { error: true, message: error.message || "Failed to fetch pull request" },
+      { status: 200 }
     );
   }
 }
