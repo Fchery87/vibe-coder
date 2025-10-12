@@ -866,6 +866,13 @@ export default function Home() {
     files.forEach(file => {
       handleCliFileModified(file.path, 'streaming generation');
     });
+
+    // Refresh Explorer/FileTree to show new files
+    try {
+      window.dispatchEvent(new CustomEvent('github:auto-refresh'));
+    } catch (err) {
+      console.error('Failed to dispatch refresh event:', err);
+    }
   };
 
   const handleStreamingError = (error: string) => {
