@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PromptInput from "@/components/PromptInput";
 import CodeEditor from "@/components/Editor";
 import FileTree from "@/components/FileTree";
@@ -15,6 +15,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import HeaderBar from "@/components/HeaderBar";
 import SettingsModal from "@/components/SettingsModal";
+import ToolDrawer, { type ToolDrawerTab } from "@/components/ToolDrawer";
+import { ToolEmptyState } from "@/components/ToolDrawerPanel";
 // Using inline SSE setup to avoid hook/runtime mismatch issues
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { GitHubRepository, WorkspaceState } from "@/lib/github-types";
@@ -23,8 +25,23 @@ import { useTabs } from "@/hooks/useTabs";
 import NotificationCenter from "@/components/NotificationCenter";
 import { useNotifications } from "@/hooks/useNotifications";
 import Explorer from "@/components/tools/Explorer";
+import SourceControlPanel from "@/components/tools/SourceControl";
+import PullRequestPanel from "@/components/tools/PullRequest";
+import SearchPanel from "@/components/tools/Search";
+import PreviewPanelTool from "@/components/tools/Preview";
+import TicketsPanel from "@/components/tools/Tickets";
 import WorkflowsPanel from "@/components/tools/Workflows";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import {
+  FolderTree,
+  GitMerge,
+  GitPullRequest,
+  Search as SearchIcon,
+  Monitor,
+  Ticket as TicketIcon,
+  Workflow,
+  Settings as SettingsIcon,
+} from "lucide-react";
 
 interface ProjectSnapshot {
   id: string;
@@ -65,6 +82,12 @@ export default function Home() {
     removeNotification
   } = useNotifications();
   const enableExplorer = useFeatureFlag('enableExplorer');
+  const enableSourceControl = useFeatureFlag('enableSourceControl');
+  const enablePR = useFeatureFlag('enablePR');
+  const enableSearch = useFeatureFlag('enableSearch');
+  const enablePreview = useFeatureFlag('enablePreview');
+  const enableTickets = useFeatureFlag('enableTickets');
+  const enableWorkflows = useFeatureFlag('enableWorkflows');
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [originalGeneratedCode, setOriginalGeneratedCode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -111,7 +134,7 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [checkpoints, setCheckpoints] = useState<ProjectSnapshot[]>([]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
 
   // Webhooks (SSE) + Auto-refresh
@@ -192,18 +215,6 @@ export default function Home() {
     return { enableNotifications: true, enableToasts: true };
   });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('serviceConnections', JSON.stringify(serviceConnections));
-    }
-  }, [serviceConnections]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('uiPreferences', JSON.stringify(uiPreferences));
-    }
-  }, [uiPreferences]);
-
   const [cliModifiedFiles, setCliModifiedFiles] = useState<Set<string>>(new Set());
   const [cliActivity, setCliActivity] = useState<{
     isActive: boolean;
@@ -223,6 +234,22 @@ export default function Home() {
   });
   const [githubConnected, setGithubConnected] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
+
+  const hasRepoConnection = Boolean(
+    workspace?.owner && workspace?.repo && workspace?.installationId
+  );
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('serviceConnections', JSON.stringify(serviceConnections));
+    }
+  }, [serviceConnections]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('uiPreferences', JSON.stringify(uiPreferences));
+    }
+  }, [uiPreferences]);
 
   const streamingFileCount = streamingFiles.length;
   const completedStreamingFiles = streamingFiles.filter(file => file.status === 'done').length;
@@ -690,6 +717,27 @@ export default function Home() {
     await handleGenerate(prompt);
   };
 
+  const pushNotification = useCallback(
+    (
+      message: string,
+      type: 'success' | 'error' | 'info' | 'warning' = 'info',
+      options?: { toast?: boolean; notification?: boolean }
+    ) => {
+      const toastAllowed = options?.toast ?? (type === 'error' || uiPreferences.enableToasts);
+      const notificationAllowed = options?.notification ?? (type === 'error' || uiPreferences.enableNotifications);
+
+      if (toastAllowed) {
+        const toastType = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+        addToast(message, toastType);
+      }
+
+      if (notificationAllowed) {
+        addNotification(message, type === 'warning' ? 'warning' : type);
+      }
+    },
+    [addNotification, addToast, uiPreferences.enableNotifications, uiPreferences.enableToasts]
+  );
+
   const handleCommand = (commandId: string) => {
     switch (commandId) {
       case 'generate':
@@ -765,6 +813,7 @@ export default function Home() {
 
   const handleCliFileModified = (filePath: string, operation: string) => {
     setCliModifiedFiles(prev => new Set([...prev, filePath]));
+    setIsDrawerCollapsed(false);
 
     // Add actionable notification
     addNotification(
@@ -778,7 +827,7 @@ export default function Home() {
         },
         {
           label: 'View in Tree',
-          onClick: () => setIsSidebarCollapsed(false),
+          onClick: () => setIsDrawerCollapsed(false),
           variant: 'secondary'
         }
       ],
@@ -874,6 +923,254 @@ export default function Home() {
       addToast('GitHub integration enabled', 'success');
     }
   };
+
+  const drawerTabs: ToolDrawerTab[] = useMemo(() => {
+    const drawer: ToolDrawerTab[] = [];
+
+    drawer.push({
+      id: 'explorer',
+      label: 'Explorer',
+      icon: <FolderTree className="w-4 h-4" />, 
+      badge: cliModifiedFiles.size > 0 ? (cliModifiedFiles.size > 9 ? '9+' : cliModifiedFiles.size) : undefined,
+      content: (
+        <div className="flex flex-col h-full">
+          {cliModifiedFiles.size > 0 && (
+            <div className="px-3 py-3 border-b border-[var(--border)] bg-blue-500/10">
+              <h4 className="text-xs font-semibold text-blue-300 mb-2 flex items-center gap-1">
+                <FolderTree className="w-3 h-3" />
+                CLI Modified ({cliModifiedFiles.size})
+              </h4>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {Array.from(cliModifiedFiles).map((filePath) => (
+                  <button
+                    key={filePath}
+                    type="button"
+                    className="w-full text-left text-xs text-blue-200 bg-blue-500/20 px-2 py-1 rounded hover:bg-blue-500/30 transition-colors"
+                    onClick={() => handleFileSelection(filePath)}
+                  >
+                    📄 {filePath.split('/').pop()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            {enableExplorer ? (
+              <Explorer
+                owner={workspace?.owner}
+                repo={workspace?.repo}
+                branch={workspace?.branch}
+                installationId={workspace?.installationId}
+                onFileSelect={(filePath) => {
+                  handleFileSelection(filePath);
+                  openTab(filePath, '', '');
+                }}
+              />
+            ) : (
+              <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
+            )}
+          </div>
+        </div>
+      ),
+    });
+
+    drawer.push({
+      id: 'source-control',
+      label: 'Source Control',
+      icon: <GitMerge className="w-4 h-4" />,
+      content: enableSourceControl ? (
+        hasRepoConnection ? (
+          <SourceControlPanel
+            owner={workspace?.owner}
+            repo={workspace?.repo}
+            branch={workspace?.branch}
+            installationId={workspace?.installationId}
+            tabs={tabs}
+            onNotification={(message, type) => pushNotification(message, type)}
+          />
+        ) : (
+          <ToolEmptyState
+            title="Connect a Repository"
+            description="Select a GitHub repository to view branches, commits, and status."
+            actionLabel="Open Settings"
+            onAction={() => setIsSettingsOpen(true)}
+          />
+        )
+      ) : (
+        <ToolEmptyState
+          title="Source Control Disabled"
+          description="Enable the Source Control feature flag in Settings to stage, commit, and branch."
+          actionLabel="Open Settings"
+          onAction={() => setIsSettingsOpen(true)}
+        />
+      ),
+    });
+
+    drawer.push({
+      id: 'pull-requests',
+      label: 'Pull Requests',
+      icon: <GitPullRequest className="w-4 h-4" />,
+      content: enablePR ? (
+        hasRepoConnection ? (
+          <PullRequestPanel
+            owner={workspace?.owner}
+            repo={workspace?.repo}
+            branch={workspace?.branch}
+            installationId={workspace?.installationId}
+            onNotification={(message, type) => pushNotification(message, type)}
+          />
+        ) : (
+          <ToolEmptyState
+            title="Connect a Repository"
+            description="Select a GitHub repository to fetch open pull requests."
+            actionLabel="Open Settings"
+            onAction={() => setIsSettingsOpen(true)}
+          />
+        )
+      ) : (
+        <ToolEmptyState
+          title="PR Tool Disabled"
+          description="Turn on the Pull Request feature flag to create and review GitHub PRs."
+          actionLabel="Open Settings"
+          onAction={() => setIsSettingsOpen(true)}
+        />
+      ),
+    });
+
+    drawer.push({
+      id: 'search',
+      label: 'Search',
+      icon: <SearchIcon className="w-4 h-4" />,
+      content: enableSearch ? (
+        hasRepoConnection ? (
+          <SearchPanel
+            owner={workspace?.owner}
+            repo={workspace?.repo}
+            installationId={workspace?.installationId}
+            onFileSelect={handleFileSelection}
+            onNotification={(message, type) => pushNotification(message, type)}
+          />
+        ) : (
+          <ToolEmptyState
+            title="Connect a Repository"
+            description="Select a GitHub repository to run code search."
+            actionLabel="Open Settings"
+            onAction={() => setIsSettingsOpen(true)}
+          />
+        )
+      ) : (
+        <ToolEmptyState
+          title="Search Disabled"
+          description="Enable the Search feature flag to query files and code across the repository."
+          actionLabel="Open Settings"
+          onAction={() => setIsSettingsOpen(true)}
+        />
+      ),
+    });
+
+    drawer.push({
+      id: 'preview',
+      label: 'Preview',
+      icon: <Monitor className="w-4 h-4" />,
+      content: enablePreview ? (
+        <PreviewPanelTool
+          previewUrl={expoProject?.devServerUrl}
+          onShare={(url) => pushNotification(`Share URL copied: ${url}`, 'info', { notification: false })}
+          onNotification={(message, type) => pushNotification(message, type)}
+        />
+      ) : (
+        <ToolEmptyState
+          title="Preview Disabled"
+          description="Enable the Preview feature flag to view sandbox output inside the sidebar."
+          actionLabel="Open Settings"
+          onAction={() => setIsSettingsOpen(true)}
+        />
+      ),
+    });
+
+    drawer.push({
+      id: 'tickets',
+      label: 'Tickets',
+      icon: <TicketIcon className="w-4 h-4" />,
+      content: enableTickets ? (
+        <TicketsPanel
+          jiraDomain={serviceConnections.jiraSiteUrl}
+          onNotification={(message, type) => pushNotification(message, type)}
+        />
+      ) : (
+        <ToolEmptyState
+          title="Tickets Disabled"
+          description="Enable the Tickets feature flag to connect Jira or Linear in the sidebar."
+          actionLabel="Open Settings"
+          onAction={() => setIsSettingsOpen(true)}
+        />
+      ),
+    });
+
+    drawer.push({
+      id: 'workflows',
+      label: 'Workflows',
+      icon: <Workflow className="w-4 h-4" />,
+      content:
+        enableWorkflows && hasRepoConnection ? (
+          <WorkflowsPanel
+            owner={workspace!.owner}
+            repo={workspace!.repo}
+            installationId={workspace!.installationId!}
+          />
+        ) : enableWorkflows ? (
+          <ToolEmptyState
+            title="Workflows Not Connected"
+            description="Select a GitHub repository to trigger and monitor Actions workflows."
+            actionLabel="Open Settings"
+            onAction={() => setIsSettingsOpen(true)}
+          />
+        ) : (
+          <ToolEmptyState
+            title="Workflows Disabled"
+            description="Enable the Workflows feature flag to trigger and monitor GitHub Actions."
+            actionLabel="Open Settings"
+            onAction={() => setIsSettingsOpen(true)}
+          />
+        ),
+    });
+
+    drawer.push({
+      id: 'settings',
+      label: 'Settings',
+      icon: <SettingsIcon className="w-4 h-4" />,
+      content: (
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-[var(--muted)]">
+            Access project integrations, feature flags, and UI preferences without leaving the workspace.
+          </p>
+          <button type="button" className="btn" onClick={() => setIsSettingsOpen(true)}>
+            Open Settings Modal
+          </button>
+        </div>
+      ),
+    });
+
+    return drawer;
+  }, [
+    cliModifiedFiles,
+    enableExplorer,
+    enableSourceControl,
+    enablePR,
+    enableSearch,
+    enablePreview,
+    enableTickets,
+    enableWorkflows,
+    hasRepoConnection,
+    workspace,
+    tabs,
+    handleFileSelection,
+    openTab,
+    handleFileContextAction,
+    expoProject,
+    pushNotification,
+    serviceConnections,
+  ]);
 
   // Expose function to switch to editor view globally for Atlas CLI
   useEffect(() => {
@@ -1054,342 +1351,13 @@ export default function Home() {
         onNotificationsClick={() => setIsNotificationCenterOpen(true)}
       />
 
-      {/* Old header backup - keeping for reference */}
-      <header className="panel shadow-panel px-4 py-3 mb-[var(--gap-5)]" style={{ display: 'none' }}>
-        <div className="flex flex-wrap items-center gap-[var(--gap-5)] w-full">
-          <div className="flex items-center gap-[var(--gap-3)] min-w-[220px]">
-            <div className="w-9 h-9 rounded-[var(--radius)] bg-gradient-to-r from-[#7c3aed] to-[#22d3ee] flex items-center justify-center shadow-panel">
-              <span className="text-white font-semibold text-sm">V</span>
-            </div>
-            <div className="leading-tight">
-              <h1 className="font-semibold tracking-tight" style={{ fontSize: 'var(--size-h1)' }}>Vibe Coder</h1>
-              <p className="text-[var(--muted)]" style={{ fontSize: 'var(--size-small)', lineHeight: '1.2' }}>AI-powered build and review workspace</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-[var(--gap-3)]">
-            <span className={["chip flex items-center gap-[var(--gap-2)]", isStreamingMode ? "on" : "off"].join(" ")}>
-              {isGenerating && isStreamingMode ? (
-                <span className="streaming-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </span>
-              ) : (
-                <span className={["badge-dot", isGenerating ? "" : "off"].filter(Boolean).join(" ")}></span>
-              )}
-              <span className="font-semibold">Streaming Mode</span>
-              {streamingFileCount > 0 && (
-                <span className="text-[var(--size-small)] text-[var(--accent-2)] font-semibold">
-                  {completedStreamingFiles}/{streamingFileCount} files / {totalStreamingLines} lines
-                </span>
-              )}
-            </span>
-            {cliActivity.isActive && (
-              <span className="flex items-center gap-[var(--gap-2)] text-[var(--size-small)] text-[var(--accent-2)]">
-                <span className="w-2 h-2 rounded-full bg-[var(--accent-2)] animate-pulse"></span>
-                {cliActivity.currentTask || 'CLI running'}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-1 flex-wrap items-center gap-[var(--gap-4)] min-w-[300px]">
-            <div className="surface-tint flex items-center gap-[var(--gap-3)] px-3 py-2 rounded-[var(--radius)] border border-[rgba(148,163,184,0.12)]">
-              <div className="flex items-center gap-[var(--gap-2)]">
-                <span className="uppercase tracking-[0.08em] text-[var(--size-small)] text-[var(--muted)]">Provider</span>
-                <select
-                  value={activeProvider}
-                  onChange={(e) => {
-                    const p = e.target.value;
-                    setActiveProvider(p);
-                    localStorage.setItem('activeProvider', p);
-                    let defaultModel = '';
-                    if (p === 'xai') defaultModel = 'grok-4-fast-reasoning';
-                    else if (p === 'openai') defaultModel = 'gpt-4o';
-                    else if (p === 'anthropic') defaultModel = 'claude-3-5-sonnet-20241022';
-                    else if (p === 'google') defaultModel = 'gemini-2.5-pro';
-                    setSelectedModel(defaultModel);
-                    if (defaultModel) localStorage.setItem('selectedModel', defaultModel);
-                  }}
-                  className="min-w-[140px]"
-                >
-                  <option value="">Select</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google</option>
-                  <option value="xai">xAI</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-[var(--gap-2)]">
-                <span className="uppercase tracking-[0.08em] text-[var(--size-small)] text-[var(--muted)]">Model</span>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => {
-                    const model = e.target.value;
-                    setSelectedModel(model);
-                    localStorage.setItem('selectedModel', model);
-                  }}
-                  className="min-w-[160px]"
-                >
-                  {activeProvider === 'xai' && (
-                    <>
-                      <option value="grok-4-fast-reasoning">grok-4-fast-reasoning</option>
-                      <option value="grok-4-fast-non-reasoning">grok-4-fast-non-reasoning</option>
-                      <option value="grok-4-0709">grok-4-0709</option>
-                      <option value="grok-code-fast-1">grok-code-fast-1</option>
-                      <option value="grok-3">grok-3</option>
-                      <option value="grok-3-mini">grok-3-mini</option>
-                      <option value="grok-2-vision-1212us-east-1">grok-2-vision-us-east</option>
-                      <option value="grok-2-vision-1212eu-west-1">grok-2-vision-eu-west</option>
-                    </>
-                  )}
-                  {activeProvider === 'openai' && (
-                    <>
-                      <option value="gpt-4o">gpt-4o</option>
-                      <option value="gpt-4-turbo">gpt-4-turbo</option>
-                      <option value="gpt-4">gpt-4</option>
-                      <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                    </>
-                  )}
-                  {activeProvider === 'anthropic' && (
-                    <>
-                      <option value="claude-3-5-sonnet-20241022">claude-3.5-sonnet</option>
-                      <option value="claude-3-opus-20240229">claude-3-opus</option>
-                      <option value="claude-3-sonnet-20240229">claude-3-sonnet</option>
-                      <option value="claude-3-haiku-20240307">claude-3-haiku</option>
-                      <option value="claude-3-5-haiku-20241022">claude-3.5-haiku</option>
-                    </>
-                  )}
-                  {activeProvider === 'google' && (
-                    <>
-                      <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                      <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                      <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
-                    </>
-                  )}
-                  {!activeProvider && <option value="">Select a provider</option>}
-                </select>
-              </div>
-
-              <button
-                onClick={() => setAllowFailover(!allowFailover)}
-                className={`chip flex items-center gap-[var(--gap-2)] ${allowFailover ? 'on' : 'off'}`}
-                type="button"
-              >
-                <span className={`badge-dot ${allowFailover ? '' : 'off'}`}>Failover</span>
-                <span className="text-[var(--size-small)]">{allowFailover ? 'Enabled' : 'Disabled'}</span>
-              </button>
-            </div>
-
-            <div className="hidden md:flex items-center gap-[var(--gap-2)]">
-              <button
-                onClick={() => createCheckpoint(`Checkpoint ${new Date().toLocaleTimeString()}`, 'Auto-generated checkpoint')}
-                disabled={isCreatingCheckpoint}
-                className="btn"
-                title="Create Checkpoint"
-              >
-                {isCreatingCheckpoint ? '...' : 'Save'}
-              </button>
-
-              {checkpoints.length > 0 && (
-                <select
-                  onChange={(e) => {
-                    const checkpointId = e.target.value;
-                    const checkpoint = checkpoints.find(c => c.id === checkpointId);
-                    if (checkpoint) {
-                      restoreCheckpoint(checkpoint);
-                    }
-                    e.target.value = '';
-                  }}
-                  className="min-w-[140px]"
-                  title="Restore checkpoint"
-                >
-                  <option value="">Checkpoints</option>
-                  {checkpoints.map(checkpoint => (
-                    <option key={checkpoint.id} value={checkpoint.id}>
-                      {checkpoint.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <button
-                onClick={exportToExpo}
-                disabled={isExportingToExpo || !generatedCode}
-                className="btn"
-                title="Export to Expo"
-              >
-                {isExportingToExpo ? '...' : 'Expo'}
-              </button>
-
-              <button
-                onClick={exportToFlutter}
-                disabled={isExportingToExpo || !generatedCode}
-                className="btn"
-                title="Export to Flutter"
-              >
-                {isExportingToExpo ? '...' : 'Flutter'}
-              </button>
-
-              <button
-                onClick={runQualityCheck}
-                disabled={isRunningQualityCheck || !generatedCode}
-                className="btn"
-                title="Run quality checks"
-              >
-                {isRunningQualityCheck ? '...' : 'QA'}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-[var(--gap-3)] ml-auto">
-            <div className="status-metrics">
-              <span><span className="text-[var(--muted)]">chars</span><strong>{generatedCode.length}</strong></span>
-              <span><span className="text-[var(--muted)]">logs</span><strong>{sandboxLogs.length}</strong></span>
-              <span><span className="text-[var(--muted)]">checkpoints</span><strong>{checkpoints.length}</strong></span>
-              {cliModifiedFiles.size > 0 && (
-                <span><span className="text-[var(--muted)]">CLI</span><strong>{cliModifiedFiles.size}</strong></span>
-              )}
-            </div>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-
       <main className="flex flex-1 min-h-0 gap-[var(--gap-5)] px-4 pb-[var(--gap-5)]">
-        {/* Sidebar Toggle Button - Desktop */}
-        <div className={`flex items-center justify-center transition-all duration-300 ease-in-out ${
-          isSidebarCollapsed ? 'w-8 bg-slate-800/80' : 'w-6 bg-[var(--panel-alt)]'
-        } border-r border-[var(--border)] hidden md:flex`}>
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-2 hover:bg-[rgba(51,65,85,0.5)] rounded transition-colors text-[var(--muted)] hover:text-white touch-manipulation"
-            title={isSidebarCollapsed ? "Show Project Files" : "Hide Project Files"}
-          >
-            {isSidebarCollapsed ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-              </svg>
-            )}
-          </button>
-        </div>
-
-        {/* Mobile Sidebar Toggle Button */}
-        {isSidebarCollapsed && (
-          <button
-            onClick={() => setIsSidebarCollapsed(false)}
-            className="fixed top-20 left-4 z-40 md:hidden glass-panel p-3 rounded-lg shadow-2xl hover:shadow-purple-500/20 transition-all duration-200 touch-manipulation"
-            title="Show Project Files"
-          >
-            <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        )}
-
-        {/* Left Sidebar - File Tree + Tools */}
-        <aside className={`border-r border-[var(--border)] transition-all duration-300 ease-in-out flex flex-col ${
-          isSidebarCollapsed ? 'w-0 overflow-hidden md:w-0' : 'w-48 lg:w-64'
-        } ${isSidebarCollapsed ? 'hidden md:flex' : 'flex'}`}>
-          {/* CLI Modified Files Section */}
-          {cliModifiedFiles.size > 0 && (
-            <div className="px-3 py-3 border-b border-[var(--border)] bg-blue-500/10">
-              <h4 className="text-xs font-semibold text-blue-300 mb-2 flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                CLI Modified ({cliModifiedFiles.size})
-              </h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {Array.from(cliModifiedFiles).map(filePath => (
-                  <div
-                    key={filePath}
-                    className="text-xs text-blue-200 bg-blue-500/20 px-2 py-1 rounded cursor-pointer hover:bg-blue-500/30 transition-colors"
-                    onClick={() => handleFileSelection(filePath)}
-                    title={`Click to open ${filePath}`}
-                  >
-                    📄 {filePath.split('/').pop()}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex-1 min-h-0">
-            {enableExplorer ? (
-              <Explorer
-                owner={workspace?.owner}
-                repo={workspace?.repo}
-                branch={workspace?.branch}
-                installationId={workspace?.installationId}
-                onFileSelect={(filePath) => {
-                  handleFileSelection(filePath);
-                  openTab(filePath, '', ''); // Open in tab (Phase 1 integration)
-                }}
-              />
-            ) : (
-              <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
-            )}
-          </div>
-
-          {/* Sidebar Tools: Workflows (Phase 7) */}
-          {workspace?.owner && workspace?.repo && workspace?.installationId && (
-            <div className="border-t border-[var(--border)] max-h-[40vh] overflow-auto">
-              <WorkflowsPanel
-                owner={workspace.owner}
-                repo={workspace.repo}
-                installationId={workspace.installationId}
-              />
-            </div>
-          )}
-        </aside>
-
-        {/* Mobile Sidebar Overlay */}
-        {!isSidebarCollapsed && (
-          <div
-            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
-            onClick={() => setIsSidebarCollapsed(true)}
-          />
-        )}
-
-        {/* Mobile Sidebar */}
-        {!isSidebarCollapsed && (
-          <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-72 max-w-[85vw] glass-panel border-r border-[var(--border)] z-40 md:hidden flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-              <h3 className="text-lg font-semibold text-white">Project Files</h3>
-              <button
-                onClick={() => setIsSidebarCollapsed(true)}
-                className="p-2 hover:bg-[rgba(51,65,85,0.5)] rounded transition-colors text-[var(--muted)] hover:text-white touch-manipulation"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-auto">
-              {enableExplorer ? (
-                <Explorer
-                  owner={workspace?.owner}
-                  repo={workspace?.repo}
-                  branch={workspace?.branch}
-                  installationId={workspace?.installationId}
-                  onFileSelect={(filePath) => {
-                    handleFileSelection(filePath);
-                    openTab(filePath, '', ''); // Open in tab
-                    setIsSidebarCollapsed(true); // Close mobile sidebar
-                  }}
-                />
-              ) : (
-                <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
-              )}
-            </div>
-          </aside>
-        )}
+        <ToolDrawer
+          tabs={drawerTabs}
+          defaultTab="explorer"
+          collapsed={isDrawerCollapsed}
+          onCollapsedChange={setIsDrawerCollapsed}
+        />
 
         {/* Main Content - Responsive Layout */}
         <div className="flex-1 flex flex-col min-h-0">

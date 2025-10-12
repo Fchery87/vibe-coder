@@ -4,7 +4,7 @@
  * Integrates with Phase 1 DiffViewer and Phase 2 Source Control
  */
 
-"'use client';
+'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
