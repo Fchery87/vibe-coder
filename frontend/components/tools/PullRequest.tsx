@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   GitPullRequest,
   Plus,
@@ -69,6 +69,11 @@ export default function PullRequest({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedPR, setSelectedPR] = useState<PR | null>(null);
   const [checkStatus, setCheckStatus] = useState<CheckStatus | null>(null);
+  const [relatedRuns, setRelatedRuns] = useState<any[]>([]);
+  const [downloadingRunId, setDownloadingRunId] = useState<number | null>(null);
+  const [prChecks, setPrChecks] = useState<Record<number, 'success' | 'pending' | 'failure' | 'none'>>({});
+  const checksCache = useRef<Map<string, { state: 'success' | 'pending' | 'failure' | 'none'; fetchedAt: number }>>(new Map());
+  const CHECK_TTL_MS = 30_000;
 
   // PR creation form
   const [prTitle, setPrTitle] = useState('');
@@ -99,6 +104,8 @@ export default function PullRequest({
         setPullRequests([]);
       } else {
         setPullRequests(data.prs || []);
+        // Clear per-PR checks to be refreshed
+        setPrChecks({});
       }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch pull requests');
@@ -108,18 +115,34 @@ export default function PullRequest({
     }
   };
 
+  // For now: do NOT prefetch checks for all PRs. We'll fetch on expand with TTL caching.
+
   // Fetch checks for selected PR
   useEffect(() => {
     if (!selectedPR || !owner || !repo || !installationId) {
       setCheckStatus(null);
+      setRelatedRuns([]);
       return;
     }
 
     fetchChecks(selectedPR.head.sha);
+    fetchRelatedRuns(selectedPR.head.sha);
   }, [selectedPR, owner, repo, installationId]);
 
   const fetchChecks = async (ref: string) => {
     if (!owner || !repo || !installationId) return;
+
+    // TTL cache: if fresh, use cached value
+    const cached = checksCache.current.get(ref);
+    const now = Date.now();
+    if (cached && now - cached.fetchedAt < CHECK_TTL_MS) {
+      setCheckStatus({ state: cached.state, total_count: 0, checks: [] });
+      // Also set badge for the selected PR if we know which is selected
+      if (selectedPR) {
+        setPrChecks((prev) => ({ ...prev, [selectedPR.number]: cached.state }));
+      }
+      return;
+    }
 
     try {
       const response = await fetch(
@@ -129,9 +152,51 @@ export default function PullRequest({
 
       if (!data.error) {
         setCheckStatus(data);
+        const state = (data && data.state) || 'none';
+        checksCache.current.set(ref, { state, fetchedAt: now });
+        if (selectedPR) {
+          setPrChecks((prev) => ({ ...prev, [selectedPR.number]: state }));
+        }
       }
     } catch (err) {
       console.error('Failed to fetch checks:', err);
+    }
+  };
+
+  const fetchRelatedRuns = async (sha: string) => {
+    if (!owner || !repo || !installationId) return;
+    try {
+      const res = await fetch(`/api/github/runs?owner=${owner}&repo=${repo}&installation_id=${installationId}`);
+      const data = await res.json();
+      if (!data.error) {
+        const runs = (data.runs || []).filter((r: any) => r.head_sha === sha);
+        setRelatedRuns(runs);
+        // Update badge from latest run outcome if available
+        if (selectedPR && runs.length > 0) {
+          const latest = runs[0];
+          const state: 'success' | 'pending' | 'failure' | 'none' =
+            latest.status !== 'completed' ? 'pending' : (latest.conclusion === 'success' ? 'success' : 'failure');
+          setPrChecks((prev) => ({ ...prev, [selectedPR.number]: state }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch related runs:', err);
+    }
+  };
+
+  const downloadLogs = async (runId: number) => {
+    if (!owner || !repo || !installationId) return;
+    try {
+      setDownloadingRunId(runId);
+      const url = `/api/github/runs/${runId}/logs?owner=${owner}&repo=${repo}&installation_id=${installationId}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      setDownloadingRunId(null);
     }
   };
 
@@ -332,19 +397,36 @@ export default function PullRequest({
                   <div className="flex items-start gap-3">
                     <GitPullRequest className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-sm font-medium truncate">{pr.title}</h4>
-                        {pr.draft && (
-                          <span className="px-1.5 py-0.5 text-xs bg-gray-500/20 text-gray-400 rounded">
-                            Draft
-                          </span>
-                        )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="text-sm font-medium truncate">{pr.title}</h4>
+                    {/* Overall checks badge */}
+                    {prChecks[pr.number] && (
+                      <span
+                        className={`px-1.5 py-0.5 text-[10px] rounded border border-[var(--border)] ${
+                          prChecks[pr.number] === 'success'
+                            ? 'text-green-400 bg-green-500/10'
+                            : prChecks[pr.number] === 'failure'
+                            ? 'text-red-400 bg-red-500/10'
+                            : prChecks[pr.number] === 'pending'
+                            ? 'text-yellow-300 bg-yellow-500/10'
+                            : 'text-slate-300 bg-slate-500/10'
+                        }`}
+                        title={`Checks: ${prChecks[pr.number]}`}
+                      >
+                        {prChecks[pr.number]}
+                      </span>
+                    )}
+                    {pr.draft && (
+                      <span className="px-1.5 py-0.5 text-xs bg-gray-500/20 text-gray-400 rounded">
+                        Draft
+                      </span>
+                    )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
                         <span>#{pr.number}</span>
                         <span>"</span>
                         <span>
-                          {pr.head.ref} ’ {pr.base.ref}
+                          {pr.head.ref} ï¿½ {pr.base.ref}
                         </span>
                         <span>"</span>
                         <span>{new Date(pr.updated_at).toLocaleDateString()}</span>
@@ -371,10 +453,50 @@ export default function PullRequest({
                                 <div key={check.id} className="flex items-center gap-2 text-xs">
                                   {getStatusIcon(check.conclusion || check.status)}
                                   <span className="truncate flex-1">{check.name}</span>
+                                  {check.html_url && (
+                                    <a
+                                      href={check.html_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-[var(--muted)] hover:text-purple-400"
+                                    >
+                                      View
+                                    </a>
+                                  )}
                                 </div>
                               ))}
                             </div>
                           )}
+
+                          {/* Related Workflow Runs */}
+                          <div className="mb-2">
+                            <div className="text-xs text-[var(--muted)] mb-1">Related Workflow Runs</div>
+                            {relatedRuns.length === 0 ? (
+                              <div className="text-xs text-[var(--muted)]">No runs found for this head commit.</div>
+                            ) : (
+                              <div className="space-y-1">
+                                {relatedRuns.slice(0, 5).map((run: any) => (
+                                  <div key={run.id} className="flex items-center gap-2 text-xs">
+                                    {getStatusIcon(run.conclusion || run.status)}
+                                    <a href={run.html_url} target="_blank" rel="noreferrer" className="truncate flex-1 hover:text-purple-400">
+                                      {run.name || `Run #${run.run_number}`} ({run.status}{run.conclusion ? ` Â· ${run.conclusion}` : ''})
+                                    </a>
+                                    {run.status === 'completed' && run.conclusion !== 'success' && (
+                                      <button
+                                        type="button"
+                                        className="px-2 py-0.5 rounded border border-[var(--border)] hover:bg-slate-700/40"
+                                        onClick={(e) => { e.stopPropagation(); downloadLogs(run.id); }}
+                                        disabled={downloadingRunId === run.id}
+                                        title="Download logs"
+                                      >
+                                        {downloadingRunId === run.id ? '...' : 'Logs'}
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
 
                           <a
                             href={pr.html_url}

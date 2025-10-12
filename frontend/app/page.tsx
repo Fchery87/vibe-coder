@@ -21,6 +21,7 @@ import { useTabs } from "@/hooks/useTabs";
 import NotificationCenter from "@/components/NotificationCenter";
 import { useNotifications } from "@/hooks/useNotifications";
 import Explorer from "@/components/tools/Explorer";
+import WorkflowsPanel from "@/components/tools/Workflows";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 
 interface ProjectSnapshot {
@@ -773,12 +774,27 @@ export default function Home() {
 
   // Expose function to switch to editor view globally for Atlas CLI
   useEffect(() => {
+    const handleAtlasUINotification = (e: any) => {
+      try {
+        const { type, title, message, url, urlLabel } = e.detail || {};
+        if (title || message) {
+          // Toast
+          addToast(title ? `${title}${message ? ` – ${message}` : ''}` : message, type === 'error' ? 'error' : type === 'success' ? 'success' : 'info');
+          // Notification Center
+          const actions = url ? [{ label: urlLabel || 'Open', onClick: () => window.open(url, '_blank'), variant: 'primary' as const }] : undefined;
+          addNotification(title ? `${title}${message ? ` – ${message}` : ''}` : (message || ''), type || 'info', actions, { url });
+        }
+      } catch {}
+    };
+
     (window as any).switchToEditorView = () => {
       setActiveView('editor');
     };
 
+    window.addEventListener('atlas-notification', handleAtlasUINotification as EventListener);
     return () => {
       delete (window as any).switchToEditorView;
+      window.removeEventListener('atlas-notification', handleAtlasUINotification as EventListener);
     };
   }, []);
 
@@ -1159,7 +1175,7 @@ export default function Home() {
           </button>
         )}
 
-        {/* Left Sidebar - File Tree */}
+        {/* Left Sidebar - File Tree + Tools */}
         <aside className={`border-r border-[var(--border)] transition-all duration-300 ease-in-out flex flex-col ${
           isSidebarCollapsed ? 'w-0 overflow-hidden md:w-0' : 'w-48 lg:w-64'
         } ${isSidebarCollapsed ? 'hidden md:flex' : 'flex'}`}>
@@ -1203,6 +1219,17 @@ export default function Home() {
               <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
             )}
           </div>
+
+          {/* Sidebar Tools: Workflows (Phase 7) */}
+          {workspace?.owner && workspace?.repo && workspace?.installationId && (
+            <div className="border-t border-[var(--border)] max-h-[40vh] overflow-auto">
+              <WorkflowsPanel
+                owner={workspace.owner}
+                repo={workspace.repo}
+                installationId={workspace.installationId}
+              />
+            </div>
+          )}
         </aside>
 
         {/* Mobile Sidebar Overlay */}
