@@ -21,9 +21,9 @@ export async function GET(request: NextRequest) {
       installations: data.installations.map((inst) => ({
         id: inst.id,
         account: {
-          login: inst.account?.login || '',
+          login: (inst.account as any)?.login || (inst.account as any)?.slug || '',
           avatar_url: inst.account?.avatar_url || '',
-          type: inst.account?.type || 'User',
+          type: (inst.account as any)?.type || 'User',
         },
         repository_selection: inst.repository_selection,
         created_at: inst.created_at,

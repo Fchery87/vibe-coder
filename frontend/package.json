@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@octokit/app": "^16.1.1",
     "@octokit/auth-app": "^8.1.1",
     "@octokit/rest": "^22.0.0",
     "@radix-ui/react-dialog": "^1.1.15",

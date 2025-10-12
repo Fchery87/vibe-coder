@@ -20,6 +20,8 @@ import TabBar from "@/components/TabBar";
 import { useTabs } from "@/hooks/useTabs";
 import NotificationCenter from "@/components/NotificationCenter";
 import { useNotifications } from "@/hooks/useNotifications";
+import Explorer from "@/components/tools/Explorer";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 
 interface ProjectSnapshot {
   id: string;
@@ -49,6 +51,7 @@ export default function Home() {
     clearAll,
     removeNotification
   } = useNotifications();
+  const enableExplorer = useFeatureFlag('enableExplorer');
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [originalGeneratedCode, setOriginalGeneratedCode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -1185,7 +1188,20 @@ export default function Home() {
           )}
 
           <div className="flex-1 min-h-0">
-            <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
+            {enableExplorer ? (
+              <Explorer
+                owner={workspace?.owner}
+                repo={workspace?.repo}
+                branch={workspace?.branch}
+                installationId={workspace?.installationId}
+                onFileSelect={(filePath) => {
+                  handleFileSelection(filePath);
+                  openTab(filePath, '', ''); // Open in tab (Phase 1 integration)
+                }}
+              />
+            ) : (
+              <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
+            )}
           </div>
         </aside>
 
@@ -1212,7 +1228,21 @@ export default function Home() {
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-auto">
-              <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
+              {enableExplorer ? (
+                <Explorer
+                  owner={workspace?.owner}
+                  repo={workspace?.repo}
+                  branch={workspace?.branch}
+                  installationId={workspace?.installationId}
+                  onFileSelect={(filePath) => {
+                    handleFileSelection(filePath);
+                    openTab(filePath, '', ''); // Open in tab
+                    setIsSidebarCollapsed(true); // Close mobile sidebar
+                  }}
+                />
+              ) : (
+                <FileTree onFileSelect={handleFileSelection} onContextAction={handleFileContextAction} />
+              )}
             </div>
           </aside>
         )}
