@@ -15,6 +15,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import HeaderBar from "@/components/HeaderBar";
 import SettingsModal from "@/components/SettingsModal";
+// Using inline SSE setup to avoid hook/runtime mismatch issues
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { GitHubRepository, WorkspaceState } from "@/lib/github-types";
 import TabBar from "@/components/TabBar";
 import { useTabs } from "@/hooks/useTabs";
@@ -39,6 +41,16 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
 }
+
+type ServiceConnectionsState = {
+  jiraSiteUrl: string;
+  linearWorkspace: string;
+};
+
+type UIPreferencesState = {
+  enableNotifications: boolean;
+  enableToasts: boolean;
+};
 
 export default function Home() {
   const { toasts, addToast, removeToast } = useToast();
@@ -101,6 +113,97 @@ export default function Home() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+
+  // Webhooks (SSE) + Auto-refresh
+  const [webhooksConnected, setWebhooksConnected] = useState(false);
+  useEffect(() => {
+    try {
+      const es = new EventSource('/api/events/sse');
+      es.onopen = () => setWebhooksConnected(true);
+      es.onerror = () => setWebhooksConnected(false);
+      es.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          if (data?.type === 'github' && data.payload) {
+            const { event, body } = data.payload;
+            window.dispatchEvent(new CustomEvent('github:event', { detail: { event, body } }));
+            if (event) {
+              window.dispatchEvent(new CustomEvent(`github:${event}`, { detail: body }));
+            }
+          }
+        } catch {}
+      };
+      return () => es.close();
+    } catch {}
+  }, []);
+
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('autoRefreshIntervalMs');
+      return saved ? parseInt(saved, 10) : 30000;
+    }
+    return 30000;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('autoRefreshIntervalMs', String(autoRefreshInterval));
+  }, [autoRefreshInterval]);
+
+  useAutoRefresh({
+    enabled: !webhooksConnected,
+    interval: autoRefreshInterval,
+    onRefresh: () => {
+      try {
+        window.dispatchEvent(new CustomEvent('app:auto-refresh'));
+        window.dispatchEvent(new CustomEvent('github:auto-refresh'));
+      } catch {}
+    },
+  });
+
+  const [serviceConnections, setServiceConnections] = useState<ServiceConnectionsState>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('serviceConnections');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return {
+            jiraSiteUrl: parsed?.jiraSiteUrl || '',
+            linearWorkspace: parsed?.linearWorkspace || '',
+          };
+        }
+      } catch {}
+    }
+    return { jiraSiteUrl: '', linearWorkspace: '' };
+  });
+
+  const [uiPreferences, setUIPreferences] = useState<UIPreferencesState>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('uiPreferences');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return {
+            enableNotifications: parsed?.enableNotifications !== false,
+            enableToasts: parsed?.enableToasts !== false,
+          };
+        }
+      } catch {}
+    }
+    return { enableNotifications: true, enableToasts: true };
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('serviceConnections', JSON.stringify(serviceConnections));
+    }
+  }, [serviceConnections]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('uiPreferences', JSON.stringify(uiPreferences));
+    }
+  }, [uiPreferences]);
+
   const [cliModifiedFiles, setCliModifiedFiles] = useState<Set<string>>(new Set());
   const [cliActivity, setCliActivity] = useState<{
     isActive: boolean;
@@ -777,12 +880,26 @@ export default function Home() {
     const handleAtlasUINotification = (e: any) => {
       try {
         const { type, title, message, url, urlLabel } = e.detail || {};
-        if (title || message) {
-          // Toast
-          addToast(title ? `${title}${message ? ` – ${message}` : ''}` : message, type === 'error' ? 'error' : type === 'success' ? 'success' : 'info');
-          // Notification Center
-          const actions = url ? [{ label: urlLabel || 'Open', onClick: () => window.open(url, '_blank'), variant: 'primary' as const }] : undefined;
-          addNotification(title ? `${title}${message ? ` – ${message}` : ''}` : (message || ''), type || 'info', actions, { url });
+        const toastType: 'success' | 'error' | 'info' =
+          type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+        const text = title ? `${title}${message ? ` – ${message}` : ''}` : message;
+        if (!text) return;
+
+        if (toastType === 'error' || uiPreferences.enableToasts) {
+          addToast(text, toastType);
+        }
+
+        if (toastType === 'error' || uiPreferences.enableNotifications) {
+          const actions = url
+            ? [
+                {
+                  label: urlLabel || 'Open',
+                  onClick: () => window.open(url, '_blank'),
+                  variant: 'primary' as const,
+                },
+              ]
+            : undefined;
+          addNotification(text, toastType, actions, { url });
         }
       } catch {}
     };
@@ -796,7 +913,7 @@ export default function Home() {
       delete (window as any).switchToEditorView;
       window.removeEventListener('atlas-notification', handleAtlasUINotification as EventListener);
     };
-  }, []);
+  }, [addToast, addNotification, uiPreferences.enableNotifications, uiPreferences.enableToasts]);
 
   // Atlas CLI Event Listeners
   useEffect(() => {
@@ -1536,6 +1653,12 @@ export default function Home() {
         selectedModel={selectedModel}
         allowFailover={allowFailover}
         githubEnabled={githubEnabled}
+        currentRepo={workspace ? `${workspace.owner}/${workspace.repo}` : null}
+        currentBranch={workspace?.branch ?? null}
+        webhooksConnected={webhooksConnected}
+        autoRefreshInterval={autoRefreshInterval}
+        serviceConnections={serviceConnections}
+        uiPreferences={uiPreferences}
         onProviderChange={(provider) => {
           setActiveProvider(provider);
           localStorage.setItem('activeProvider', provider);
@@ -1546,6 +1669,9 @@ export default function Home() {
         }}
         onFailoverChange={setAllowFailover}
         onGitHubEnabledChange={handleGitHubEnabledChange}
+        onAutoRefreshIntervalChange={setAutoRefreshInterval}
+        onServiceConnectionsChange={setServiceConnections}
+        onUIPreferencesChange={setUIPreferences}
       />
 
       {/* Toast Notifications */}

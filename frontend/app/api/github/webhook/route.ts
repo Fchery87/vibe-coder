@@ -1,112 +1,44 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifyWebhookSignature } from "@/lib/github-client";
-import { WebhookEvent } from "@/lib/github-types";
-
-// In-memory event store for demo (use Redis/DB in production)
-const webhookEvents: WebhookEvent[] = [];
-const MAX_EVENTS = 100;
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyWebhookSignature } from '@/lib/github-client';
+import { getWebhookEventBus } from '@/lib/webhook-events';
 
 export async function POST(request: NextRequest) {
   try {
-    const signature = request.headers.get("x-hub-signature-256");
+    const secret = process.env.GITHUB_WEBHOOK_SECRET;
+    if (!secret) {
+      return NextResponse.json({ error: true, message: 'Webhook secret not configured' }, { status: 500 });
+    }
+
+    // Get raw body for signature verification
     const rawBody = await request.text();
+    const signature = request.headers.get('x-hub-signature-256') || '';
+    const event = request.headers.get('x-github-event') || 'unknown';
 
-    if (!signature) {
-      return NextResponse.json(
-        { error: "Missing signature" },
-        { status: 401 }
-      );
+    const ok = verifyWebhookSignature(rawBody, secret, signature);
+    if (!ok) {
+      return NextResponse.json({ error: true, message: 'Invalid signature' }, { status: 401 });
     }
 
-    // Verify webhook signature
-    const isValid = verifyWebhookSignature(
-      rawBody,
-      process.env.GITHUB_WEBHOOK_SECRET!,
-      signature
-    );
+    // Parse event body
+    const body = JSON.parse(rawBody);
 
-    if (!isValid) {
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 401 }
-      );
+    // Minimal logging + shaping a response for debugging
+    const info = { event, action: body.action, repository: body.repository?.full_name, sender: body.sender?.login };
+    console.log('GitHub webhook received:', info);
+
+    // Broadcast to SSE clients
+    try {
+      const bus = getWebhookEventBus();
+      bus.emit('github:event', { event, body });
+      // Also emit more specific channels for convenience
+      if (event) bus.emit(`github:${event}`, body);
+    } catch (e) {
+      console.warn('Webhook broadcast failed:', e);
     }
 
-    const payload = JSON.parse(rawBody);
-    const eventType = request.headers.get("x-github-event");
-
-    if (!eventType) {
-      return NextResponse.json(
-        { error: "Missing event type" },
-        { status: 400 }
-      );
-    }
-
-    // Create webhook event
-    const webhookEvent: WebhookEvent = {
-      type: eventType as WebhookEvent['type'],
-      action: payload.action,
-      data: payload,
-      timestamp: new Date().toISOString(),
-    };
-
-    // Store event
-    webhookEvents.unshift(webhookEvent);
-    if (webhookEvents.length > MAX_EVENTS) {
-      webhookEvents.pop();
-    }
-
-    // Log event for debugging
-    console.log(`[Webhook] ${eventType}:${payload.action || 'unknown'}`, {
-      repo: payload.repository?.full_name,
-      sender: payload.sender?.login,
-    });
-
-    // Handle specific event types
-    switch (eventType) {
-      case 'push':
-        console.log(`[Webhook] Push to ${payload.ref} in ${payload.repository?.full_name}`);
-        break;
-
-      case 'pull_request':
-        console.log(`[Webhook] PR #${payload.pull_request?.number} ${payload.action} in ${payload.repository?.full_name}`);
-        break;
-
-      case 'issue_comment':
-      case 'pull_request_review_comment':
-        console.log(`[Webhook] Comment ${payload.action} in ${payload.repository?.full_name}`);
-        break;
-
-      case 'check_suite':
-      case 'check_run':
-        console.log(`[Webhook] Check ${payload.action} in ${payload.repository?.full_name}`);
-        break;
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Webhook error:", error);
-    return NextResponse.json(
-      { error: error.message || "Webhook processing failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error('Webhook error:', err);
+    return NextResponse.json({ error: true, message: err.message || 'Webhook error' }, { status: 200 });
   }
-}
-
-// Get recent webhook events
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const limit = parseInt(searchParams.get("limit") || "20");
-  const type = searchParams.get("type");
-
-  let events = [...webhookEvents];
-
-  if (type) {
-    events = events.filter(e => e.type === type);
-  }
-
-  return NextResponse.json({
-    events: events.slice(0, limit),
-    total: webhookEvents.length,
-  });
 }

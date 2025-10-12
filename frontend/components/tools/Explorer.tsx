@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   ChevronRight,
@@ -59,38 +59,55 @@ export default function Explorer({
   const [activePath, setActivePath] = useState<string | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
+  const fetchFiles = useCallback(async () => {
+    if (!owner || !repo || !installationId) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/github/files?owner=${owner}&repo=${repo}&branch=${branch}&installationId=${installationId}`
+      );
+      const data = await response.json();
+
+      if (data.error) {
+        setError(data.message);
+        setFiles([]);
+      } else {
+        setFiles(data.tree || []);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch files');
+      setFiles([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [owner, repo, branch, installationId]);
+
   // Fetch files from GitHub
   useEffect(() => {
-    if (!owner || !repo || !installationId) {
-      return;
-    }
-
-    const fetchFiles = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(
-          `/api/github/files?owner=${owner}&repo=${repo}&branch=${branch}&installationId=${installationId}`
-        );
-        const data = await response.json();
-
-        if (data.error) {
-          setError(data.message);
-          setFiles([]);
-        } else {
-          setFiles(data.tree || []);
-        }
-      } catch (err: any) {
-        setError(err.message || 'Failed to fetch files');
-        setFiles([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchFiles();
-  }, [owner, repo, branch, installationId]);
+  }, [fetchFiles]);
+
+  useEffect(() => {
+    const handlePush = (event: any) => {
+      const detail = event.detail;
+      const pushedFullName = detail?.repository?.full_name;
+      const pushedName = detail?.repository?.name;
+      if (!repo) return;
+      if (pushedFullName && owner && pushedFullName !== `${owner}/${repo}`) return;
+      if (pushedName && pushedName !== repo) return;
+      fetchFiles();
+    };
+    const handleAutoRefresh = () => fetchFiles();
+
+    window.addEventListener('github:push', handlePush as EventListener);
+    window.addEventListener('github:auto-refresh', handleAutoRefresh as EventListener);
+    return () => {
+      window.removeEventListener('github:push', handlePush as EventListener);
+      window.removeEventListener('github:auto-refresh', handleAutoRefresh as EventListener);
+    };
+  }, [fetchFiles, owner, repo]);
 
   // Flatten tree structure for virtual scrolling
   const flattenedItems = useMemo(() => {
@@ -181,26 +198,7 @@ export default function Explorer({
     );
 
     // Refetch
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `/api/github/files?owner=${owner}&repo=${repo}&branch=${branch}&installationId=${installationId}`
-      );
-      const data = await response.json();
-
-      if (data.error) {
-        setError(data.message);
-        setFiles([]);
-      } else {
-        setFiles(data.tree || []);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to refresh files');
-    } finally {
-      setIsLoading(false);
-    }
+    await fetchFiles();
   };
 
   // Empty state when not configured

@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Ticket, AlertCircle, Settings, Link as LinkIcon } from 'lucide-react';
 import ToolDrawerPanel, { ToolEmptyState, ToolErrorState } from '@/components/ToolDrawerPanel';
 import TicketCard from '@/components/TicketCard';
@@ -83,12 +83,7 @@ export default function Tickets({ jiraDomain, currentPR, onNotification }: Ticke
   const [issueComments, setIssueComments] = useState<any[]>([]);
   const [issueTransitions, setIssueTransitions] = useState<any[]>([]);
 
-  // Load projects and recent issues
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -125,7 +120,22 @@ export default function Tickets({ jiraDomain, currentPR, onNotification }: Ticke
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Load projects and recent issues
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    const handleIssuesEvent = () => loadInitialData();
+    window.addEventListener('github:issues', handleIssuesEvent as EventListener);
+    window.addEventListener('github:auto-refresh', handleIssuesEvent as EventListener);
+    return () => {
+      window.removeEventListener('github:issues', handleIssuesEvent as EventListener);
+      window.removeEventListener('github:auto-refresh', handleIssuesEvent as EventListener);
+    };
+  }, [loadInitialData]);
 
   const handleCreateIssue = async () => {
     if (!selectedProject || !summary) {

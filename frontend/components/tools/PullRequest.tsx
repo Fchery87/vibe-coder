@@ -4,9 +4,9 @@
  * Integrates with Phase 1 DiffViewer and Phase 2 Source Control
  */
 
-'use client';
+"'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   GitPullRequest,
   Plus,
@@ -16,7 +16,6 @@ import {
   AlertCircle,
   ExternalLink,
   RefreshCw,
-  MessageSquare,
 } from 'lucide-react';
 import ToolDrawerPanel, { ToolEmptyState, ToolLoadingState, ToolErrorState } from '@/components/ToolDrawerPanel';
 
@@ -80,14 +79,7 @@ export default function PullRequest({
   const [prBody, setPrBody] = useState('');
   const [baseBranch, setBaseBranch] = useState('main');
 
-  // Fetch pull requests
-  useEffect(() => {
-    if (!owner || !repo || !installationId) return;
-
-    fetchPullRequests();
-  }, [owner, repo, installationId]);
-
-  const fetchPullRequests = async () => {
+  const fetchPullRequests = useCallback(async () => {
     if (!owner || !repo || !installationId) return;
 
     setIsLoading(true);
@@ -113,23 +105,17 @@ export default function PullRequest({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [owner, repo, installationId]);
+
+  // Fetch pull requests
+  useEffect(() => {
+    if (!owner || !repo || !installationId) return;
+    fetchPullRequests();
+  }, [owner, repo, installationId, fetchPullRequests]);
 
   // For now: do NOT prefetch checks for all PRs. We'll fetch on expand with TTL caching.
 
-  // Fetch checks for selected PR
-  useEffect(() => {
-    if (!selectedPR || !owner || !repo || !installationId) {
-      setCheckStatus(null);
-      setRelatedRuns([]);
-      return;
-    }
-
-    fetchChecks(selectedPR.head.sha);
-    fetchRelatedRuns(selectedPR.head.sha);
-  }, [selectedPR, owner, repo, installationId]);
-
-  const fetchChecks = async (ref: string) => {
+  const fetchChecks = useCallback(async (ref: string) => {
     if (!owner || !repo || !installationId) return;
 
     // TTL cache: if fresh, use cached value
@@ -161,9 +147,9 @@ export default function PullRequest({
     } catch (err) {
       console.error('Failed to fetch checks:', err);
     }
-  };
+  }, [owner, repo, installationId, selectedPR]);
 
-  const fetchRelatedRuns = async (sha: string) => {
+  const fetchRelatedRuns = useCallback(async (sha: string) => {
     if (!owner || !repo || !installationId) return;
     try {
       const res = await fetch(`/api/github/runs?owner=${owner}&repo=${repo}&installation_id=${installationId}`);
@@ -182,7 +168,19 @@ export default function PullRequest({
     } catch (err) {
       console.error('Failed to fetch related runs:', err);
     }
-  };
+  }, [owner, repo, installationId, selectedPR]);
+
+  // Fetch checks for selected PR
+  useEffect(() => {
+    if (!selectedPR || !owner || !repo || !installationId) {
+      setCheckStatus(null);
+      setRelatedRuns([]);
+      return;
+    }
+
+    fetchChecks(selectedPR.head.sha);
+    fetchRelatedRuns(selectedPR.head.sha);
+  }, [selectedPR, owner, repo, installationId, fetchChecks, fetchRelatedRuns]);
 
   const downloadLogs = async (runId: number) => {
     if (!owner || !repo || !installationId) return;
@@ -199,6 +197,34 @@ export default function PullRequest({
       setDownloadingRunId(null);
     }
   };
+
+  useEffect(() => {
+    const handlePullRequestEvent = () => fetchPullRequests();
+    const handleCheckRunEvent = (event: any) => {
+      const detail = event.detail;
+      const headSha =
+        detail?.check_run?.head_sha ||
+        detail?.workflow_run?.head_sha ||
+        detail?.pull_request?.head?.sha;
+      if (selectedPR && headSha && headSha === selectedPR.head.sha) {
+        fetchChecks(selectedPR.head.sha);
+        fetchRelatedRuns(selectedPR.head.sha);
+      }
+    };
+    const handleAutoRefresh = () => fetchPullRequests();
+
+    window.addEventListener('github:pull_request', handlePullRequestEvent as EventListener);
+    window.addEventListener('github:check_run', handleCheckRunEvent as EventListener);
+    window.addEventListener('github:workflow_run', handleCheckRunEvent as EventListener);
+    window.addEventListener('github:auto-refresh', handleAutoRefresh as EventListener);
+
+    return () => {
+      window.removeEventListener('github:pull_request', handlePullRequestEvent as EventListener);
+      window.removeEventListener('github:check_run', handleCheckRunEvent as EventListener);
+      window.removeEventListener('github:workflow_run', handleCheckRunEvent as EventListener);
+      window.removeEventListener('github:auto-refresh', handleAutoRefresh as EventListener);
+    };
+  }, [fetchPullRequests, fetchChecks, fetchRelatedRuns, selectedPR]);
 
   const handleCreatePR = async () => {
     if (!owner || !repo || !branch || !installationId) return;

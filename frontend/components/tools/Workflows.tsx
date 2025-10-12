@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import ToolDrawerPanel, { ToolEmptyState, ToolErrorState, ToolLoadingState } from "@/components/ToolDrawerPanel";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ToolDrawerPanel, {
+  ToolEmptyState,
+  ToolErrorState,
+  ToolLoadingState,
+} from "@/components/ToolDrawerPanel";
 import { Play, RefreshCw } from "lucide-react";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import WorkflowRunCard from "@/components/WorkflowRunCard";
@@ -30,39 +34,101 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
   const [isDispatching, setIsDispatching] = useState(false);
   const [refInput, setRefInput] = useState<string>("main");
   const [inputs, setInputs] = useState<Array<{ key: string; value: string }>>([]);
-  const [schemaHint, setSchemaHint] = useState<Array<{ key: string; description?: string; required?: boolean; default?: string }>>([]);
+  const [schemaHint, setSchemaHint] = useState<
+    Array<{ key: string; description?: string; required?: boolean; default?: string }>
+  >([]);
   const [actionsDisabled, setActionsDisabled] = useState(false);
   const lastRunStatus = useRef<Record<number, string>>({});
-  const selectedWorkflow = useMemo(() => workflows.find(w => w.id === selected) || null, [selected, workflows]);
 
-  useEffect(() => {
+  const selectedWorkflow = useMemo(
+    () => workflows.find((w) => w.id === selected) || null,
+    [selected, workflows]
+  );
+
+  const loadWorkflows = useCallback(async () => {
     if (!enabled) return;
-    const fetchWorkflows = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/github/workflows?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&installation_id=${installationId}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.message || "Failed to load workflows");
-        setWorkflows(data.workflows || []);
-        if (!selected && data.workflows?.length) setSelected(data.workflows[0].id);
-      } catch (e: any) {
-        setError(e.message);
-        if (/Actions may be disabled/i.test(e.message)) setActionsDisabled(true);
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/github/workflows?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(
+          repo
+        )}&installation_id=${installationId}`
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.message || "Failed to load workflows");
+      setActionsDisabled(false);
+      setWorkflows(data.workflows || []);
+      if (!selected && data.workflows?.length) {
+        setSelected(data.workflows[0].id);
       }
-    };
-    fetchWorkflows();
-  }, [enabled, owner, repo, installationId]);
+    } catch (e: any) {
+      setError(e.message);
+      if (/Actions may be disabled/i.test(e.message)) setActionsDisabled(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [enabled, owner, repo, installationId, selected]);
 
-  // Load workflow schema hints (inputs) when selection changes
   useEffect(() => {
-    const wf = selected ? workflows.find(w => w.id === selected) : null;
-    if (!wf || !wf.path) { setSchemaHint([]); return; }
+    loadWorkflows();
+  }, [loadWorkflows]);
+
+  const loadRuns = useCallback(
+    async (workflowId?: number | null) => {
+      const targetId = workflowId ?? selected;
+      if (!targetId) return;
+      try {
+        const res = await fetch(
+          `/api/github/runs?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(
+            repo
+          )}&installation_id=${installationId}&workflow_id=${targetId}`
+        );
+        const data = await res.json();
+        if (!data.error) {
+          const newRuns = data.runs || [];
+          newRuns.forEach((r: any) => {
+            const prev = lastRunStatus.current[r.id];
+            if (prev && prev !== r.status && r.status === "completed") {
+              const type = r.conclusion === "success" ? "success" : "error";
+              const title = `Workflow ${r.name || r.run_number} completed`;
+              const message = `Conclusion: ${r.conclusion || "unknown"}`;
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("atlas-notification", {
+                    detail: { type, title, message, url: r.html_url, urlLabel: "View run" },
+                  })
+                );
+              } catch {}
+            }
+            lastRunStatus.current[r.id] = r.status;
+          });
+          setRuns(newRuns);
+        }
+      } catch {}
+    },
+    [installationId, owner, repo, selected]
+  );
+
+  useEffect(() => {
+    loadRuns();
+    const timer = window.setInterval(() => loadRuns(), 10000);
+    return () => window.clearInterval(timer);
+  }, [loadRuns]);
+
+  useEffect(() => {
+    const wf = selected ? workflows.find((w) => w.id === selected) : null;
+    if (!wf || !wf.path) {
+      setSchemaHint([]);
+      return;
+    }
     const load = async () => {
       try {
-        const res = await fetch(`/api/github/workflows/schema?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&installation_id=${installationId}&path=${encodeURIComponent(wf.path)}`);
+        const res = await fetch(
+          `/api/github/workflows/schema?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(
+            repo
+          )}&installation_id=${installationId}&path=${encodeURIComponent(wf.path)}`
+        );
         const data = await res.json();
         if (!data.error) {
           setSchemaHint(data.inputs || []);
@@ -73,46 +139,43 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
       } catch {}
     };
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, owner, repo, installationId]);
+  }, [selected, workflows, owner, repo, installationId, inputs.length]);
 
   useEffect(() => {
-    let timer: any;
-    const fetchRuns = async () => {
-      if (!selected) return;
-      try {
-        const res = await fetch(`/api/github/runs?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&installation_id=${installationId}&workflow_id=${selected}`);
-        const data = await res.json();
-        if (!data.error) {
-          const newRuns = data.runs || [];
-          // Detect completion events to send a lightweight notification
-          newRuns.forEach((r: any) => {
-            const prev = lastRunStatus.current[r.id];
-            if (prev && prev !== r.status && r.status === 'completed') {
-              const type = r.conclusion === 'success' ? 'success' : 'error';
-              const title = `Workflow ${r.name || r.run_number} completed`;
-              const message = `Conclusion: ${r.conclusion || 'unknown'}`;
-              try {
-                window.dispatchEvent(new CustomEvent('atlas-notification', { detail: { type, title, message, url: r.html_url, urlLabel: 'View run' } }));
-              } catch {}
-            }
-            lastRunStatus.current[r.id] = r.status;
-          });
-          setRuns(newRuns);
-        }
-      } catch {}
+    const handleWorkflowRun = (event: any) => {
+      const detail = event.detail;
+      const workflowRun = detail?.workflow_run;
+      const workflowId =
+        workflowRun?.workflow_id ?? detail?.check_run?.check_suite?.workflow_id ?? null;
+      if (!workflowId && !workflowRun) return;
+      if (!selected || workflowId === selected) {
+        loadRuns(workflowId ?? selected);
+      }
     };
-    fetchRuns();
-    // Poll every 10s for live updates (fallback when no webhooks)
-    timer = setInterval(fetchRuns, 10000);
-    return () => clearInterval(timer);
-  }, [selected, owner, repo, installationId]);
+    const handleWorkflowDispatch = () => loadWorkflows();
+    const handleAutoRefresh = () => {
+      loadWorkflows();
+      loadRuns();
+    };
+    window.addEventListener("github:workflow_run", handleWorkflowRun as EventListener);
+    window.addEventListener("github:workflow_job", handleWorkflowRun as EventListener);
+    window.addEventListener("github:check_run", handleWorkflowRun as EventListener);
+    window.addEventListener("github:workflow_dispatch", handleWorkflowDispatch as EventListener);
+    window.addEventListener("github:auto-refresh", handleAutoRefresh as EventListener);
+    return () => {
+      window.removeEventListener("github:workflow_run", handleWorkflowRun as EventListener);
+      window.removeEventListener("github:workflow_job", handleWorkflowRun as EventListener);
+      window.removeEventListener("github:check_run", handleWorkflowRun as EventListener);
+      window.removeEventListener("github:workflow_dispatch", handleWorkflowDispatch as EventListener);
+      window.removeEventListener("github:auto-refresh", handleAutoRefresh as EventListener);
+    };
+  }, [loadWorkflows, loadRuns, selected]);
 
   const trigger = async () => {
     if (!selected) return;
     setIsDispatching(true);
     try {
-      const hasInputs = inputs.some(i => i.key.trim().length > 0);
+      const hasInputs = inputs.some((i) => i.key.trim().length > 0);
       const payloadInputs = hasInputs
         ? inputs.reduce<Record<string, string>>((acc, cur) => {
             if (cur.key.trim()) acc[cur.key.trim()] = cur.value;
@@ -126,9 +189,8 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.message || "Failed to dispatch workflow");
-      // Kick a quick refresh of runs
       setTimeout(() => {
-        setSelected(selected);
+        loadRuns(selected);
       }, 1000);
     } catch (e: any) {
       setError(e.message);
@@ -141,9 +203,9 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
     try {
       setDownloadingRunId(runId);
       const url = `/api/github/runs/${runId}/logs?owner=${owner}&repo=${repo}&installation_id=${installationId}`;
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = '';
+      a.download = "";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -166,7 +228,7 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
       {loading ? (
         <ToolLoadingState message="Loading workflows..." />
       ) : error ? (
-        <ToolErrorState message={error} onRetry={() => { setError(null); setLoading(true); }} />
+        <ToolErrorState message={error} onRetry={() => loadWorkflows()} />
       ) : (
         <div className="p-3 flex flex-col gap-3">
           {/* Workflow selector + trigger */}
@@ -176,8 +238,10 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
               value={selected ?? ""}
               onChange={(e) => setSelected(Number(e.target.value))}
             >
-              {workflows.map(w => (
-                <option key={w.id} value={w.id}>{w.name}</option>
+              {workflows.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
               ))}
             </select>
 
@@ -188,12 +252,14 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
               onChange={(e) => setRefInput(e.target.value)}
             />
 
-            <button type="button" className="btn" onClick={trigger} disabled={isDispatching || !selected || actionsDisabled} title={actionsDisabled ? "Actions disabled" : "Trigger workflow"}>
-              {isDispatching ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
+            <button
+              type="button"
+              className="btn"
+              onClick={trigger}
+              disabled={isDispatching || !selected || actionsDisabled}
+              title={actionsDisabled ? "Actions disabled" : "Trigger workflow"}
+            >
+              {isDispatching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               <span className="ml-1">Run</span>
             </button>
           </div>
@@ -208,54 +274,64 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
                   <span
                     key={idx}
                     className="px-1 py-0.5 rounded border border-[var(--border)] text-[var(--text)]/90"
-                    title={`${i.description || 'No description'}${i.required ? ' (required)' : ''}${i.default ? `\nDefault: ${i.default}` : ''}`}
+                    title={`${i.description || "No description"}${i.required ? " (required)" : ""}${
+                      i.default ? `\nDefault: ${i.default}` : ""
+                    }`}
                   >
-                    {i.key}{i.required ? '*' : ''}
+                    {i.key}
+                    {i.required ? "*" : ""}
                   </span>
                 ))}
               </div>
             )}
             {inputs.length === 0 && (
-              <div className="text-xs text-[var(--muted)] mb-2">No inputs. Add key/value pairs if your workflow expects them.</div>
+              <div className="text-xs text-[var(--muted)] mb-2">
+                No inputs. Add key/value pairs if your workflow expects them.
+              </div>
             )}
             <div className="flex flex-col gap-2">
               {inputs.map((row, idx) => {
-                const hint = schemaHint.find(h => h.key === row.key);
-                const tooltip = hint ? `${hint.description || 'No description'}${hint.required ? ' (required)' : ''}${hint.default ? `\nDefault: ${hint.default}` : ''}` : '';
+                const hint = schemaHint.find((h) => h.key === row.key);
+                const tooltip = hint
+                  ? `${hint.description || "No description"}${hint.required ? " (required)" : ""}${
+                      hint.default ? `\nDefault: ${hint.default}` : ""
+                    }`
+                  : "";
                 return (
-                <div key={idx} className="flex items-center gap-2">
-                  <input
-                    className="input flex-1"
-                    placeholder="key"
-                    value={row.key}
-                    title={tooltip}
-                    onChange={(e) => {
-                      const next = [...inputs];
-                      next[idx] = { ...row, key: e.target.value };
-                      setInputs(next);
-                    }}
-                  />
-                  <input
-                    className="input flex-1"
-                    placeholder="value"
-                    value={row.value}
-                    title={tooltip}
-                    onChange={(e) => {
-                      const next = [...inputs];
-                      next[idx] = { ...row, value: e.target.value };
-                      setInputs(next);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="px-2 py-1 text-xs rounded border border-[var(--border)] hover:bg-slate-700/40"
-                    onClick={() => setInputs(inputs.filter((_, i) => i !== idx))}
-                    title="Remove"
-                  >
-                    Remove
-                  </button>
-                </div>
-              );})}
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      className="input flex-1"
+                      placeholder="key"
+                      value={row.key}
+                      title={tooltip}
+                      onChange={(e) => {
+                        const next = [...inputs];
+                        next[idx] = { ...row, key: e.target.value };
+                        setInputs(next);
+                      }}
+                    />
+                    <input
+                      className="input flex-1"
+                      placeholder="value"
+                      value={row.value}
+                      title={tooltip}
+                      onChange={(e) => {
+                        const next = [...inputs];
+                        next[idx] = { ...row, value: e.target.value };
+                        setInputs(next);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-xs rounded border border-[var(--border)] hover:bg-slate-700/40"
+                      onClick={() => setInputs(inputs.filter((_, i) => i !== idx))}
+                      title="Remove"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
             </div>
             <div className="mt-2">
               <button
@@ -284,7 +360,7 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
                   <div className="flex-1">
                     <WorkflowRunCard run={run} />
                   </div>
-                  {run.status === 'completed' && run.conclusion !== 'success' && (
+                  {run.status === "completed" && run.conclusion !== "success" && (
                     <button
                       type="button"
                       className="px-2 py-1 text-xs rounded border border-[var(--border)] hover:bg-slate-700/40"
@@ -292,7 +368,7 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
                       disabled={downloadingRunId === run.id}
                       title="Download logs"
                     >
-                      {downloadingRunId === run.id ? '...' : 'Logs'}
+                      {downloadingRunId === run.id ? "..." : "Logs"}
                     </button>
                   )}
                 </div>
