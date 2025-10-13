@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type MouseEvent, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type MouseEvent, type ReactNode } from "react";
 import {
   ChevronRight,
   Folder,
@@ -8,23 +8,83 @@ import {
   Sparkles,
   Wrench,
   TestTube,
-  Gauge
+  Gauge,
+  RefreshCw
 } from "lucide-react";
 
-const initialData = [
-  { id: "1", name: "public", children: [{ id: "2", name: "index.html", path: "public/index.html" }] },
-  { id: "3", name: "src", children: [{ id: "4", name: "App.js", path: "src/App.js" }] },
-  { id: "5", name: "package.json", path: "package.json" },
-];
+interface FileNode {
+  id: string;
+  name: string;
+  path?: string;
+  type?: 'file' | 'folder';
+  children?: FileNode[];
+}
 
 interface FileTreeProps {
   onFileSelect?: (filePath: string) => void;
   onContextAction?: (action: string, filename: string) => void;
 }
 
+const fallbackData: FileNode[] = [
+  { id: "1", name: "public", children: [{ id: "2", name: "index.html", path: "public/index.html", type: 'file' }], type: 'folder' },
+  { id: "3", name: "src", children: [{ id: "4", name: "App.js", path: "src/App.js", type: 'file' }], type: 'folder' },
+  { id: "5", name: "package.json", path: "package.json", type: 'file' },
+];
+
 export default function FileTree({ onFileSelect, onContextAction }: FileTreeProps) {
   const [allCollapsed, setAllCollapsed] = useState(true);
   const [activePath, setActivePath] = useState<string | null>(null);
+  const [files, setFiles] = useState<FileNode[]>(fallbackData);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchFiles = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/local-files');
+      const data = await response.json();
+
+      if (data.success && data.tree) {
+        if (data.tree.length > 0) {
+          setFiles(data.tree);
+        } else {
+          // If workspace is empty, show fallback data
+          setFiles(fallbackData);
+        }
+      } else {
+        setError(data.error || 'Failed to fetch files');
+        setFiles(fallbackData);
+      }
+    } catch (err: any) {
+      console.error('Error fetching files:', err);
+      setError(err.message || 'Failed to fetch files');
+      setFiles(fallbackData);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFiles();
+  }, [fetchFiles]);
+
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('FileTree: Refreshing files...');
+      fetchFiles();
+    };
+
+    window.addEventListener('github:auto-refresh', handleRefresh as EventListener);
+    window.addEventListener('filetree:refresh', handleRefresh as EventListener);
+
+    return () => {
+      window.removeEventListener('github:auto-refresh', handleRefresh as EventListener);
+      window.removeEventListener('filetree:refresh', handleRefresh as EventListener);
+    };
+  }, [fetchFiles]);
 
   const toggleAllFolders = () => {
     setAllCollapsed((prev) => !prev);
@@ -41,32 +101,52 @@ export default function FileTree({ onFileSelect, onContextAction }: FileTreeProp
       <div className="flex items-center justify-between">
         <div className="leading-tight">
           <h3 className="font-semibold" style={{ fontSize: 'var(--size-h2)' }}>Project Files</h3>
-          <p className="text-[var(--size-small)] text-[var(--muted)]">Workspace tree</p>
+          <p className="text-[var(--size-small)] text-[var(--muted)]">
+            {isLoading ? 'Loading...' : error ? 'Demo mode' : 'Local workspace'}
+          </p>
         </div>
-        <button
-          onClick={toggleAllFolders}
-          className="btn"
-          type="button"
-          title={allCollapsed ? "Expand all" : "Collapse all"}
-        >
-          {allCollapsed ? 'Expand' : 'Collapse'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchFiles}
+            className="btn p-2"
+            type="button"
+            title="Refresh files"
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={toggleAllFolders}
+            className="btn"
+            type="button"
+            title={allCollapsed ? "Expand all" : "Collapse all"}
+          >
+            {allCollapsed ? 'Expand' : 'Collapse'}
+          </button>
+        </div>
       </div>
 
       <div className="divider" />
 
       <div className="flex-1 overflow-auto space-y-1 pr-1">
-        {initialData.map((item) => (
-          <FileTreeItem
-            key={item.id}
-            item={item}
-            level={0}
-            onFileSelect={(path) => handleSelect(path)}
-            onContextAction={onContextAction}
-            forceCollapsed={allCollapsed}
-            activePath={activePath}
-          />
-        ))}
+        {files.length === 0 ? (
+          <div className="text-center py-8 text-[var(--muted)] text-sm">
+            <p>No files in workspace</p>
+            <p className="text-xs mt-2">Generated files will appear here</p>
+          </div>
+        ) : (
+          files.map((item) => (
+            <FileTreeItem
+              key={item.id}
+              item={item}
+              level={0}
+              onFileSelect={(path) => handleSelect(path)}
+              onContextAction={onContextAction}
+              forceCollapsed={allCollapsed}
+              activePath={activePath}
+            />
+          ))
+        )}
       </div>
     </div>
   );

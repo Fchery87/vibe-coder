@@ -29,6 +29,7 @@ export default function StreamingEditor({
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentSession, setCurrentSession] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
+  const filesRef = useRef<StreamingFile[]>([]);
 
   // Get language from file extension
   const getLanguageFromPath = (path: string): string => {
@@ -98,6 +99,10 @@ export default function StreamingEditor({
       }, 10);
     }
   };
+
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
 
   // Force editor update with proper formatting
   const forceEditorUpdate = (path: string) => {
@@ -329,17 +334,25 @@ export default function StreamingEditor({
                 console.log('Closing file:', closedPath);
                 closeTab(closedPath);
               } else if (data.type === 'COMPLETE') {
-                console.log('Streaming complete - files generated:', files.length);
-                console.log('Files:', files.map(f => ({ path: f.path, contentLength: f.content.length })));
+                const completedFiles = filesRef.current;
+                console.log('[StreamingEditor] 🎉 Streaming complete - files generated:', completedFiles.length);
+                console.log('[StreamingEditor] Files:', completedFiles.map(f => ({ path: f.path, contentLength: f.content.length, status: f.status })));
 
                 // Keep streaming active but mark as complete for UI feedback
                 setIsStreaming(false);
 
                 // Ensure we have files before calling completion callback
-                if (files.length > 0) {
-                  onStreamingComplete?.(files);
+                if (completedFiles.length > 0) {
+                  console.log('[StreamingEditor] ✅ Calling onStreamingComplete with', completedFiles.length, 'files');
+                  const filesToSend = completedFiles.map(f => ({
+                    path: f.path,
+                    content: f.content,
+                    status: f.status
+                  }));
+                  console.log('[StreamingEditor] Files being sent:', filesToSend.map(f => f.path));
+                  onStreamingComplete?.(filesToSend as any);
                 } else {
-                  console.warn('No files generated, but streaming completed');
+                  console.warn('[StreamingEditor] ⚠️ No files generated, but streaming completed');
                   onStreamingComplete?.([]);
                 }
                 break;

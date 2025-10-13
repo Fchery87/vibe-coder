@@ -773,6 +773,11 @@ export default function Home() {
 
   const handleFileSelection = async (filePath: string) => {
     try {
+      // Exit streaming mode when user explicitly opens a file so the editor becomes visible
+      if (isStreamingMode) {
+        setIsStreamingMode(false);
+      }
+
       // For demo purposes, we'll load the index.html file content
       // In a real app, you'd make an API call to read the file
       let content: string;
@@ -847,7 +852,7 @@ export default function Home() {
     }
   };
 
-  const handleStreamingComplete = (files: Array<{ path: string; status: string; content: string }>) => {
+  const handleStreamingComplete = async (files: Array<{ path: string; status: string; content: string }>) => {
     console.log('Streaming completed with files:', files.length, files.map(f => f.path));
 
     // Keep streaming files for display
@@ -867,9 +872,34 @@ export default function Home() {
       handleCliFileModified(file.path, 'streaming generation');
     });
 
+    // Save files to local workspace
+    try {
+      console.log('[FileTree] Attempting to save files:', files.map(f => f.path));
+
+      const response = await fetch('/api/local-files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('[FileTree] ✅ Files saved to workspace:', data.savedFiles);
+        addToast(`Saved ${data.savedFiles.length} files to workspace`, 'success');
+      } else {
+        console.error('[FileTree] ❌ Failed to save files:', data.error);
+        addToast(`Failed to save files: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      console.error('[FileTree] ❌ Error saving files to workspace:', err);
+      addToast(`Error saving files: ${err}`, 'error');
+    }
+
     // Refresh Explorer/FileTree to show new files
     try {
       window.dispatchEvent(new CustomEvent('github:auto-refresh'));
+      window.dispatchEvent(new CustomEvent('filetree:refresh'));
     } catch (err) {
       console.error('Failed to dispatch refresh event:', err);
     }
