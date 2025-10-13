@@ -2,11 +2,16 @@
 
 import { useState } from 'react';
 
+type PromptMode = 'quick' | 'think' | 'ask';
+
 interface PromptInputProps {
   onSubmit: (prompt: string) => void;
+  mode: PromptMode;
+  onModeChange: (mode: PromptMode) => void;
+  askEnabled?: boolean;
 }
 
-export default function PromptInput({ onSubmit }: PromptInputProps) {
+export default function PromptInput({ onSubmit, mode, onModeChange, askEnabled = false }: PromptInputProps) {
   const [prompt, setPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,6 +40,12 @@ export default function PromptInput({ onSubmit }: PromptInputProps) {
     "Create a real-time chat application"
   ];
 
+  const promptModes: Array<{ id: PromptMode; label: string; description: string; disabled?: boolean }> = [
+    { id: 'quick', label: 'Quick', description: 'Fast code streaming' },
+    { id: 'think', label: 'Think', description: 'Plan + stream code' },
+    { id: 'ask', label: 'Ask', description: 'Guidance only', disabled: !askEnabled },
+  ];
+
   return (
     <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
       {/* Header */}
@@ -47,11 +58,31 @@ export default function PromptInput({ onSubmit }: PromptInputProps) {
             Describe what you want to build and let AI create it for you
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">{prompt.length} chars</span>
-          <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full">
-            Ctrl+Enter
-          </span>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">{prompt.length} chars</span>
+            <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full">
+              Ctrl+Enter
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            {promptModes.map(({ id, label, description, disabled }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => !disabled && onModeChange(id)}
+                disabled={disabled || isSubmitting}
+                className={`px-3 py-1.5 rounded-full border text-xs transition-colors ${
+                  mode === id
+                    ? 'border-purple-400 bg-purple-500/20 text-purple-200'
+                    : 'border-slate-600/60 text-gray-400 hover:border-purple-400 hover:text-white'
+                } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                title={description + (disabled ? ' (Enable Ask Mode in Settings)' : '')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

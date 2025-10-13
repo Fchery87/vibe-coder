@@ -1,0 +1,4 @@
+The CLI will build and deploy your project. It will output the deployment URL.
+
+6.  **Production Deployment:**
+    For a production deployment, use:

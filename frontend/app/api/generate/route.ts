@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import fs from 'fs/promises';
+import path from 'path';
 import prettier from 'prettier';
 import babelPlugin from 'prettier/plugins/babel';
 import estreePlugin from 'prettier/plugins/estree';
@@ -26,15 +28,29 @@ const PRETTIER_OPTIONS = {
 };
 
 interface StreamMessage {
-  type: 'FILE_OPEN' | 'APPEND' | 'FILE_CLOSE' | 'COMPLETE' | 'ERROR';
+  type:
+    | 'FILE_OPEN'
+    | 'APPEND'
+    | 'FILE_CLOSE'
+    | 'COMPLETE'
+    | 'ERROR'
+    | 'LOG'
+    | 'ANSWER';
   path?: string;
   text?: string;
   message?: string;
+  chunk?: string;
+  title?: string;
+  section?: string;
+  items?: Array<string | { label?: string; value?: string; text?: string }>;
+  kind?: string;
 }
 
 // Backend API URL - adjust if your backend runs on a different port
 // Use 127.0.0.1 instead of localhost to avoid DNS/network issues in Next.js
 const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:3001';
+
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 class MockStreamingGenerator {
   private files: Array<{ path: string; content: string }> = [];
@@ -272,16 +288,250 @@ document.head.appendChild(style);`
 
 }
 
+interface RepoContext {
+  packageName: string;
+  scripts: string[];
+  envKeys: string[];
+  hasNext: boolean;
+}
+
+class AnswerModeGenerator {
+  private readonly promptLower: string;
+
+  constructor(private readonly prompt: string) {
+    this.promptLower = prompt.toLowerCase();
+  }
+
+  private async loadContext(): Promise<RepoContext> {
+    const context: RepoContext = {
+      packageName: 'this project',
+      scripts: [],
+      envKeys: [],
+      hasNext: false,
+    };
+
+    try {
+      const pkgRaw = await fs.readFile(path.join(process.cwd(), 'package.json'), 'utf-8');
+      const pkgJson = JSON.parse(pkgRaw);
+      context.packageName = pkgJson.name || context.packageName;
+      context.scripts = Object.keys(pkgJson.scripts || {});
+      context.hasNext = Boolean(pkgJson.dependencies?.next || pkgJson.devDependencies?.next);
+    } catch (error) {
+      console.warn('[AnswerMode] Unable to read package.json:', error);
+    }
+
+    try {
+      const envRaw = await fs.readFile(path.join(process.cwd(), '.env.example'), 'utf-8');
+      context.envKeys = envRaw
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#') && line.includes('='))
+        .map((line) => line.split('=')[0]);
+    } catch (error) {
+      console.warn('[AnswerMode] No .env.example found or unreadable:', error);
+    }
+
+    return context;
+  }
+
+  private isVercelQuestion(): boolean {
+    return this.promptLower.includes('vercel');
+  }
+
+  private buildVercelSections(context: RepoContext): StreamMessage[] {
+    const sections: StreamMessage[] = [];
+    const buildCommand = context.scripts.includes('build') ? 'npm run build' : 'npm run build';
+    const devCommand = context.scripts.includes('dev') ? 'npm run dev' : 'npm run dev';
+    const envSummary =
+      context.envKeys.length > 0
+        ? `Environment variables to configure: ${context.envKeys.slice(0, 6).join(', ')}${
+            context.envKeys.length > 6 ? ', ...' : ''
+          }`
+        : 'Review .env.example for required environment variables';
+
+    sections.push({
+      type: 'LOG',
+      kind: 'overview',
+      title: 'Overview',
+      text: `Deploy the ${context.hasNext ? 'Next.js' : 'web'} workspace to Vercel using either the GitHub integration or the Vercel CLI.`,
+    });
+
+    sections.push({
+      type: 'LOG',
+      kind: 'prerequisites',
+      title: 'Prerequisites',
+      items: [
+        'Vercel account with access to the desired team or personal scope',
+        'Node.js 18 or newer and npm installed locally',
+        'Install the Vercel CLI globally: npm install -g vercel',
+        envSummary,
+      ],
+    });
+
+    sections.push({
+      type: 'LOG',
+      kind: 'steps',
+      title: 'Steps - GitHub Integration',
+      items: [
+        'Push your local branch to GitHub so Vercel can import it',
+        'In Vercel, click "Add New" -> "Project" and import the repository',
+        'Accept the detected Next.js defaults (framework: Next.js, output: .vercel/output)',
+        'Add environment variables from .env.example in the Vercel dashboard',
+        'Deploy the project and monitor build logs until they finish',
+        'Verify the preview URL and promote to Production when ready',
+      ],
+    });
+
+    sections.push({
+      type: 'LOG',
+      kind: 'steps',
+      title: 'Steps - Vercel CLI',
+      items: [
+        'npm install -g vercel',
+        'vercel login',
+        `vercel --prod  # choose ${context.packageName}`,
+        'vercel env pull .env.local  # optional: sync env vars locally',
+        'vercel deploy --prod  # create a production deployment when ready',
+      ],
+    });
+
+    const vercelJson = `{
+  "buildCommand": "${buildCommand}",
+  "framework": "nextjs"
+}`;
+
+    sections.push({
+      type: 'LOG',
+      kind: 'config',
+      title: 'Config & Commands',
+      items: [
+        `vercel.json (optional):\n${vercelJson}`,
+        `Build command: ${buildCommand}`,
+        `Dev command: ${devCommand}`,
+        envSummary,
+      ],
+    });
+
+    sections.push({
+      type: 'LOG',
+      kind: 'validation',
+      title: 'Validation',
+      items: [
+        'Monitor the Vercel build logs for warnings or failing steps',
+        'Open the assigned preview URL and smoke-test critical flows',
+        'Confirm environment variables resolved correctly in the deployment',
+      ],
+    });
+
+    sections.push({
+      type: 'LOG',
+      kind: 'nextSteps',
+      title: 'Next Steps',
+      items: [
+        'Enable GitHub check integration to surface deployment status on pull requests',
+        'Configure custom domains and preview URL naming',
+        'Enable Vercel Analytics or Speed Insights as needed',
+      ],
+    });
+
+    sections.push({
+      type: 'ANSWER',
+      chunk:
+        'Tip: keep your Vercel project linked to GitHub so every pull request receives a preview URL automatically. Use `vercel env ls` to double-check secrets before promoting to production.\n',
+    });
+
+    return sections;
+  }
+
+  private buildGenericSections(context: RepoContext): StreamMessage[] {
+    return [
+      {
+        type: 'LOG',
+        kind: 'overview',
+        title: 'Overview',
+        text: `Guidance mode summarises actionable steps for: "${this.prompt}"`,
+      },
+      {
+        type: 'LOG',
+        kind: 'context',
+        title: 'Repository Notes',
+        items: [
+          `Package: ${context.packageName}`,
+          context.scripts.length
+            ? `Available scripts: ${context.scripts.join(', ')}`
+            : 'No npm scripts detected',
+          context.envKeys.length
+            ? `Environment variables: ${context.envKeys.join(', ')}`
+            : 'Define required environment variables in Settings',
+        ],
+      },
+      {
+        type: 'ANSWER',
+        chunk:
+          'Review the repo README and existing npm scripts to adapt these steps to your request. Ask again with more specifics to receive a tailored runbook.\n',
+      },
+    ];
+  }
+
+  async *generateStream(): AsyncGenerator<StreamMessage> {
+    const context = await this.loadContext();
+    const sections = this.isVercelQuestion()
+      ? this.buildVercelSections(context)
+      : this.buildGenericSections(context);
+
+    for (const section of sections) {
+      yield section;
+      await delay(80);
+    }
+
+    yield { type: 'COMPLETE', kind: 'answer' };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, model, provider, routingMode } = body;
+    const { prompt, model, provider, routingMode, mode } = body;
 
     if (!prompt) {
       return new Response('Prompt is required', { status: 400 });
     }
 
     console.log('[Stream API] Generating code with backend API', { prompt: prompt.substring(0, 50), model, provider });
+
+    const modeType = typeof mode === 'string' ? mode.toLowerCase() : 'build';
+
+    if (modeType === 'answer') {
+      const generator = new AnswerModeGenerator(prompt);
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const message of generator.generateStream()) {
+              controller.enqueue('data: ' + JSON.stringify(message) + '\n\n');
+            }
+          } catch (error: any) {
+            controller.enqueue(
+              'data: ' +
+                JSON.stringify({
+                  type: 'ERROR',
+                  message: error?.message || 'Failed to generate answer response',
+                }) +
+                '\n\n'
+            );
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    }
 
     // Call backend API to generate code with streaming enabled
     let backendResponse: Response;

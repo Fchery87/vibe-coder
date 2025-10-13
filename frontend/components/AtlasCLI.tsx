@@ -22,12 +22,14 @@ import {
   ArrowUpCircle
 } from 'lucide-react';
 
+type PromptMode = 'quick' | 'think' | 'ask';
+
 interface CLICommand {
   id: string;
   command: string;
   output: string;
   timestamp: Date;
-  type: 'command' | 'response' | 'error' | 'success' | 'info';
+  type: 'command' | 'response' | 'error' | 'success' | 'info' | 'answer';
   executionTime?: number;
   icon?: 'push' | 'pr' | 'comment' | 'review' | 'check' | 'info' | 'rocket' | 'lightbulb' | 'folder';
 }
@@ -40,8 +42,21 @@ interface ThinkEvent {
   output?: string;
 }
 
+interface AnswerStreamDetail {
+  sessionId: string;
+  prompt: string;
+  chunk?: string;
+  type?: string;
+  section?: string;
+  title?: string;
+  items?: string[];
+  source?: 'cli' | 'prompt';
+  status?: 'complete' | 'error';
+  error?: string;
+}
+
 interface AtlasCLIProps {
-  onCommand: (command: string) => Promise<void>;
+  onCommand: (command: string, options?: { mode?: PromptMode; sessionId?: string; source?: 'cli' | 'prompt' }) => Promise<void>;
   isGenerating?: boolean;
   generatedCode?: string;
   executionResult?: any;
@@ -49,6 +64,9 @@ interface AtlasCLIProps {
   onFileModified?: (filePath: string, operation: string) => void;
   onCliActivity?: (activity: { isActive: boolean; currentTask?: string; progress?: number }) => void;
   githubEnabled?: boolean;
+  activeMode: PromptMode;
+  onModeChange?: (mode: PromptMode) => void;
+  askEnabled?: boolean;
 }
 
 export default function AtlasCLI({
@@ -59,7 +77,10 @@ export default function AtlasCLI({
   sandboxLogs,
   onFileModified,
   onCliActivity,
-  githubEnabled = false
+  githubEnabled = false,
+  activeMode,
+  onModeChange,
+  askEnabled = false,
 }: AtlasCLIProps) {
   const [commands, setCommands] = useState<CLICommand[]>([
     {
@@ -104,17 +125,21 @@ Ready to build something amazing? Just describe it!`,
     currentTask?: string;
     progress?: number;
   }>({ isActive: false });
-  const [isThinkMode, setIsThinkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('atlasThinkingMode');
-      return saved ? JSON.parse(saved) : true;
-    }
-    return true;
-  });
+  const [isThinkMode, setIsThinkMode] = useState(activeMode === 'think');
   const isThinkModeRef = useRef(isThinkMode); // Track current thinking mode state
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const shellExecutor = ShellExecutor.getInstance();
+  const answerSessionsRef = useRef<Map<string, { responseId: string }>>(new Map());
+
+  useEffect(() => {
+    const next = activeMode === 'think';
+    setIsThinkMode(next);
+    isThinkModeRef.current = next;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('atlasThinkingMode', JSON.stringify(next));
+    }
+  }, [activeMode]);
 
   // Poll for webhook events (only if GitHub is enabled)
   const { events: webhookEvents } = useWebhookEvents({
@@ -136,19 +161,30 @@ Ready to build something amazing? Just describe it!`,
   }, [isThinkMode]);
 
   // Toggle thinking mode
-  const toggleThinkingMode = () => {
-    const newMode = !isThinkMode;
-    setIsThinkMode(newMode);
-    isThinkModeRef.current = newMode;
-    localStorage.setItem('atlasThinkingMode', JSON.stringify(newMode));
+  const setMode = (nextMode: PromptMode, options: { emitInfo?: boolean } = {}) => {
+    if (onModeChange) {
+      onModeChange(nextMode);
+    } else {
+      const nextValue = nextMode === 'think';
+      setIsThinkMode(nextValue);
+      isThinkModeRef.current = nextValue;
+      localStorage.setItem('atlasThinkingMode', JSON.stringify(nextValue));
+    }
 
-    addCommand(
-      'atlas thinking-mode',
-      newMode
-        ? 'Thinking mode enabled - You will see detailed reasoning logs during code generation'
-        : 'Thinking mode disabled - Only showing final results',
-      'info'
-    );
+    if (options.emitInfo) {
+      const message =
+        nextMode === 'think'
+          ? 'Thinking mode enabled - You will see detailed reasoning logs during code generation'
+          : nextMode === 'ask'
+            ? 'Answer mode enabled - Responses will stream to the CLI without modifying files'
+            : 'Thinking mode disabled - Only showing final results';
+      addCommand('atlas mode', message, 'info');
+    }
+  };
+
+  const toggleThinkingMode = () => {
+    const nextMode: PromptMode = isThinkModeRef.current ? 'quick' : 'think';
+    setMode(nextMode, { emitInfo: true });
   };
 
   // Emit function for structured thinking mode logging
@@ -196,6 +232,121 @@ ${timestamp}
     setCommands(prev => [...prev, thinkingCommand]);
     console.log(`[${timestamp}] ${kindLabel}:`, { items, text, output });
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const ensureAnswerEntry = (detail: AnswerStreamDetail) => {
+      const { sessionId, prompt, source } = detail;
+      if (!sessionId) return null;
+      const existing = answerSessionsRef.current.get(sessionId);
+      if (existing) {
+        return existing.responseId;
+      }
+
+      const responseId = `answer-${sessionId}`;
+      answerSessionsRef.current.set(sessionId, { responseId });
+      setCommands(prev => {
+        const next = [...prev];
+        if (source !== 'cli') {
+          next.push({
+            id: `ask-command-${sessionId}`,
+            command: prompt,
+            output: '',
+            timestamp: new Date(),
+            type: 'command'
+          });
+        }
+        next.push({
+          id: responseId,
+          command: 'Answer Mode',
+          output: 'Answering...',
+          timestamp: new Date(),
+          type: 'answer',
+          icon: 'lightbulb'
+        });
+        return next;
+      });
+
+      return responseId;
+    };
+
+    const startListener = (event: Event) => {
+      const detail = (event as CustomEvent<AnswerStreamDetail>).detail;
+      if (!detail) return;
+      ensureAnswerEntry(detail);
+    };
+
+    const chunkListener = (event: Event) => {
+      const detail = (event as CustomEvent<AnswerStreamDetail>).detail;
+      if (!detail?.sessionId || !detail.chunk) return;
+      const session = answerSessionsRef.current.get(detail.sessionId);
+      const responseId = session?.responseId || ensureAnswerEntry(detail);
+      if (!responseId) return;
+      const chunk = detail.chunk;
+      setCommands(prev =>
+        prev.map(cmd => {
+          if (cmd.id !== responseId) return cmd;
+          const existingOutput = cmd.output === 'Answering...' ? '' : cmd.output || '';
+          return {
+            ...cmd,
+            output: existingOutput + chunk,
+            type: 'answer'
+          };
+        })
+      );
+    };
+
+    const completeListener = (event: Event) => {
+      const detail = (event as CustomEvent<AnswerStreamDetail>).detail;
+      if (!detail?.sessionId) return;
+      const session = answerSessionsRef.current.get(detail.sessionId);
+      if (!session) return;
+      setCommands(prev =>
+        prev.map(cmd => {
+          if (cmd.id !== session.responseId) return cmd;
+          return {
+            ...cmd,
+            output: (cmd.output || '').replace(/Answering\.\.\.$/, '').trimEnd() + '\n\n✅ Answer complete',
+            type: 'answer'
+          };
+        })
+      );
+      answerSessionsRef.current.delete(detail.sessionId);
+    };
+
+    const errorListener = (event: Event) => {
+      const detail = (event as CustomEvent<AnswerStreamDetail>).detail;
+      if (!detail?.sessionId) return;
+      const session = answerSessionsRef.current.get(detail.sessionId);
+      if (!session) return;
+      setCommands(prev =>
+        prev.map(cmd => {
+          if (cmd.id !== session.responseId) return cmd;
+          return {
+            ...cmd,
+            output: `${cmd.output || ''}\n\n❌ ${detail.error || 'Answer mode failed'}`,
+            type: 'error'
+          };
+        })
+      );
+      answerSessionsRef.current.delete(detail.sessionId);
+    };
+
+    window.addEventListener('atlas:answer-start', startListener as EventListener);
+    window.addEventListener('atlas:answer-chunk', chunkListener as EventListener);
+    window.addEventListener('atlas:answer-complete', completeListener as EventListener);
+    window.addEventListener('atlas:answer-error', errorListener as EventListener);
+
+    return () => {
+      window.removeEventListener('atlas:answer-start', startListener as EventListener);
+      window.removeEventListener('atlas:answer-chunk', chunkListener as EventListener);
+      window.removeEventListener('atlas:answer-complete', completeListener as EventListener);
+      window.removeEventListener('atlas:answer-error', errorListener as EventListener);
+    };
+  }, []);
 
   // Focus input on component mount and load environment info
   useEffect(() => {
@@ -421,7 +572,7 @@ ${timestamp}
     const hasThinkFlag = thinkIndex !== -1;
 
     if (hasThinkFlag) {
-      setIsThinkMode(true);
+      setMode('think', { emitInfo: true });
       // Remove --think from args for processing
       args.splice(thinkIndex, 1);
     }
@@ -490,32 +641,33 @@ ${timestamp}
       default:
         // If command doesn't match any specific atlas subcommand, treat as direct prompt
         if (cmd.length > 2 && !cmd.startsWith('/')) {
-          // Always use streaming mode for prompts
-          console.log('[Atlas CLI] Checking for streaming function:', typeof (window as any).startStreamingSession);
-          console.log('[Atlas CLI] Checking for view switch function:', typeof (window as any).switchToEditorView);
-
-          if ((window as any).startStreamingSession) {
-            console.log('[Atlas CLI] Starting streaming session with prompt:', cmd);
-            // Switch to editor view before starting streaming
-            if ((window as any).switchToEditorView) {
-              (window as any).switchToEditorView();
-              console.log('[Atlas CLI] Switched to editor view');
-            }
-            // Small delay to ensure editor is rendered
-            setTimeout(() => {
-              console.log('[Atlas CLI] Calling startStreamingSession after delay');
-              if ((window as any).startStreamingSession) {
-                (window as any).startStreamingSession(cmd);
-                console.log('[Atlas CLI] startStreamingSession called successfully');
-              } else {
-                console.error('[Atlas CLI] startStreamingSession not available after delay!');
-              }
-            }, 100);
-            addCommand(cmd, '🚀 Generating code with real-time streaming...', 'info');
+          if (activeMode === 'ask') {
+            const sessionId = `ask-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            await onCommand(cmd, { mode: 'ask', sessionId, source: 'cli' });
           } else {
-            console.log('[Atlas CLI] Streaming not available, using fallback');
-            // Fallback to regular generation if streaming not available
-            await onCommand(cmd);
+            console.log('[Atlas CLI] Checking for streaming function:', typeof (window as any).startStreamingSession);
+            console.log('[Atlas CLI] Checking for view switch function:', typeof (window as any).switchToEditorView);
+
+            if ((window as any).startStreamingSession) {
+              console.log('[Atlas CLI] Starting streaming session with prompt:', cmd);
+              if ((window as any).switchToEditorView) {
+                (window as any).switchToEditorView();
+                console.log('[Atlas CLI] Switched to editor view');
+              }
+              setTimeout(() => {
+                console.log('[Atlas CLI] Calling startStreamingSession after delay');
+                if ((window as any).startStreamingSession) {
+                  (window as any).startStreamingSession(cmd);
+                  console.log('[Atlas CLI] startStreamingSession called successfully');
+                } else {
+                  console.error('[Atlas CLI] startStreamingSession not available after delay!');
+                }
+              }, 100);
+              addCommand(cmd, 'dYs? Generating code with real-time streaming...', 'info');
+            } else {
+              console.log('[Atlas CLI] Streaming not available, using fallback');
+              await onCommand(cmd, { mode: activeMode });
+            }
           }
         } else if (cmd.startsWith('/')) {
           addCommand(cmd, `Command not found: ${baseCommand}. Type /commands to see all available commands.`, 'error');
@@ -1192,8 +1344,9 @@ Try: npm install, git status, ls, or any shell command`;
       case 'command': return 'text-green-400';
       case 'response': return 'text-blue-400';
       case 'error': return 'text-red-400';
-      case 'success': return 'text-green-400';
+      case 'success': return 'text-emerald-400';
       case 'info': return 'text-cyan-400';
+      case 'answer': return 'text-blue-300';
       default: return 'text-gray-400';
     }
   };
@@ -1237,6 +1390,8 @@ Try: npm install, git status, ls, or any shell command`;
           return <Info className={`${iconClass} text-cyan-400`} />;
         case 'command':
           return <Terminal className={`${iconClass} text-green-400`} />;
+        case 'answer':
+          return <Lightbulb className={`${iconClass} text-blue-300`} />;
         default:
           return null;
       }
@@ -1245,17 +1400,16 @@ Try: npm install, git status, ls, or any shell command`;
     return null;
   };
 
+  const modeOptions: Array<{ id: PromptMode; label: string; hint: string; disabled?: boolean }> = [
+    { id: 'quick', label: 'Quick', hint: 'Fast code streaming' },
+    { id: 'think', label: 'Think', hint: 'Plan/research with extra logs' },
+    { id: 'ask', label: 'Ask', hint: 'Text-only guidance', disabled: !askEnabled }
+  ];
+
   const activityDotClass = [
     'w-2.5 h-2.5 rounded-full',
     cliActivity.isActive ? 'bg-[var(--accent-2)] animate-pulse' : 'bg-[var(--success)]'
   ].join(' ');
-
-  const thinkingChipClass = [
-    'chip flex items-center gap-[var(--gap-2)]',
-    isThinkMode ? 'on' : 'off'
-  ].join(' ');
-
-  const thinkingBadgeClass = ['badge-dot', isThinkMode ? '' : 'off'].filter(Boolean).join(' ');
 
   return (
     <div className="panel flex flex-col h-full font-mono overflow-hidden" style={{ fontSize: 'var(--size-code)' }}>
@@ -1273,16 +1427,30 @@ Try: npm install, git status, ls, or any shell command`;
           )}
         </div>
         <div className="flex items-center gap-[var(--gap-3)]">
-          <button
-            onClick={toggleThinkingMode}
-            className={thinkingChipClass}
-            type="button"
-            title={isThinkMode ? 'Disable thinking mode' : 'Enable thinking mode'}
-          >
-            <span className={thinkingBadgeClass}></span>
-            <span>Thinking Mode</span>
-            <span className="text-[var(--size-small)]">{isThinkMode ? 'ON' : 'OFF'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {modeOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  if (option.disabled || activeMode === option.id) return;
+                  const emitInfo = option.id === 'think' || option.id === 'quick';
+                  setMode(option.id, { emitInfo });
+                }}
+                disabled={option.disabled}
+                className={[
+                  'px-3 py-1.5 rounded-full border text-xs transition-colors',
+                  activeMode === option.id
+                    ? 'border-purple-400 bg-purple-500/20 text-purple-100'
+                    : 'border-slate-600/60 text-gray-400 hover:border-purple-400 hover:text-white',
+                  option.disabled ? 'opacity-40 cursor-not-allowed hover:border-slate-600/60 hover:text-gray-400' : ''
+                ].join(' ')}
+                title={option.disabled ? `${option.hint} (Enable Ask Mode in Settings)` : option.hint}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           <div className="status-metrics">
             <span><span className="text-[var(--muted)]">commands</span><strong>{commands.length}</strong></span>
             <span><span className="text-[var(--muted)]">files</span><strong>{modifiedFiles.size}</strong></span>

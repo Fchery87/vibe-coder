@@ -14,6 +14,9 @@ export const FEATURE_FLAGS = {
   enableTickets: false,
   enableWorkflows: false,
 
+  // Assistant Modes
+  enableAskMode: false,
+
   // Integration Features
   enableGitHubApp: false,
   enableWebhooks: false,

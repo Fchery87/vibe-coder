@@ -69,6 +69,21 @@ type UIPreferencesState = {
   enableToasts: boolean;
 };
 
+type PromptMode = 'quick' | 'think' | 'ask';
+
+interface AnswerStreamEventDetail {
+  sessionId: string;
+  prompt: string;
+  chunk?: string;
+  type?: string;
+  section?: string;
+  title?: string;
+  items?: any[];
+  source?: 'cli' | 'prompt';
+  status?: 'complete' | 'error';
+  error?: string;
+}
+
 export default function Home() {
   const { toasts, addToast, removeToast } = useToast();
   const { tabs, activeTabId, activeTab: activeFileTab, openTab, closeTab, selectTab, updateTabContent } = useTabs();
@@ -88,12 +103,14 @@ export default function Home() {
   const enablePreview = useFeatureFlag('enablePreview');
   const enableTickets = useFeatureFlag('enableTickets');
   const enableWorkflows = useFeatureFlag('enableWorkflows');
+  const enableAskMode = useFeatureFlag('enableAskMode');
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [originalGeneratedCode, setOriginalGeneratedCode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [executionResult, setExecutionResult] = useState<any>(null);
   const [sandboxLogs, setSandboxLogs] = useState<any[]>([]);
   const [snapshots, setSnapshots] = useState<ProjectSnapshot[]>([]);
+  const [chatMode, setChatMode] = useState<PromptMode>('quick');
   const [isCreatingCheckpoint, setIsCreatingCheckpoint] = useState(false);
   const [isExportingToExpo, setIsExportingToExpo] = useState(false);
   const [expoProject, setExpoProject] = useState<{
@@ -223,6 +240,20 @@ export default function Home() {
   }>({ isActive: false });
   const [isStreamingMode, setIsStreamingMode] = useState(true);
   const [streamingFiles, setStreamingFiles] = useState<Array<{ path: string; status: string; content: string }>>([]);
+
+  useEffect(() => {
+    if (!enableAskMode && chatMode === 'ask') {
+      setChatMode('quick');
+    }
+  }, [enableAskMode, chatMode]);
+
+  useEffect(() => {
+    if (chatMode === 'ask' && isStreamingMode) {
+      setIsStreamingMode(false);
+    } else if (chatMode !== 'ask' && !isStreamingMode) {
+      setIsStreamingMode(true);
+    }
+  }, [chatMode, isStreamingMode]);
 
   // GitHub workspace state
   const [githubEnabled, setGithubEnabled] = useState(() => {
@@ -695,27 +726,189 @@ export default function Home() {
     }
   };
 
-  const handleChatSubmit = async (prompt: string) => {
-    // If in streaming mode, start streaming instead of regular generation
-    if (isStreamingMode) {
+  const emitAnswerEvent = (name: string, detail: AnswerStreamEventDetail) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+  };
+
+  const formatAnswerLog = (log: any): string => {
+    const rawTitle = log.title || log.section || 'Notes';
+    const normalizedTitle = typeof rawTitle === 'string'
+      ? rawTitle.replace(/[_-]+/g, ' ')
+      : String(rawTitle);
+    const heading = normalizedTitle.charAt(0).toUpperCase() + normalizedTitle.slice(1);
+    let output = `\n${heading}\n${'-'.repeat(heading.length)}\n`;
+
+    if (typeof log.text === 'string' && log.text.trim().length > 0) {
+      output += `${log.text.trim()}\n`;
+    }
+
+    if (Array.isArray(log.items) && log.items.length > 0) {
+      log.items.forEach((item: any, index: number) => {
+        if (typeof item === 'string') {
+          const prefix = log.kind === 'steps' ? `${index + 1}.` : '-';
+          output += `${prefix} ${item.trim()}\n`;
+        } else if (item && typeof item === 'object') {
+          const label = item.label || item.title || `Item ${index + 1}`;
+          const value = item.value ?? item.text ?? '';
+          output += `- ${label}${value ? `: ${value}` : ''}\n`;
+        }
+      });
+    }
+
+    if (Array.isArray(log.commands)) {
+      log.commands.forEach((command: string) => {
+        output += `  $ ${command}\n`;
+      });
+    }
+
+    return `${output}\n`;
+  };
+
+  const handleAnswerPrompt = async (
+    prompt: string,
+    options?: { sessionId?: string; source?: 'cli' | 'prompt' }
+  ) => {
+    const sessionId = options?.sessionId ?? `ask-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const source = options?.source ?? 'prompt';
+
+    emitAnswerEvent('atlas:answer-start', { sessionId, prompt, source });
+
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          mode: 'answer',
+          workspace: workspace
+            ? { owner: workspace.owner, repo: workspace.repo, branch: workspace.branch }
+            : null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Answer mode failed');
+        emitAnswerEvent('atlas:answer-error', { sessionId, prompt, source, error: errorText });
+        addToast('Answer mode failed to respond.', 'error');
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        emitAnswerEvent('atlas:answer-error', { sessionId, prompt, source, error: 'Empty response' });
+        addToast('Answer mode returned an empty response.', 'error');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const segments = buffer.split('\n');
+
+        for (let i = 0; i < segments.length - 1; i++) {
+          const line = segments[i].trim();
+          if (!line.startsWith('data:')) continue;
+
+          const payloadRaw = line.slice(5).trim();
+          if (!payloadRaw) continue;
+
+          try {
+            const payload = JSON.parse(payloadRaw);
+            if (payload.type === 'ANSWER') {
+              const chunk = payload.chunk ?? payload.text ?? '';
+              if (chunk) {
+                emitAnswerEvent('atlas:answer-chunk', {
+                  sessionId,
+                  prompt,
+                  source,
+                  chunk,
+                  type: 'answer',
+                });
+              }
+            } else if (payload.type === 'LOG') {
+              const chunk = formatAnswerLog(payload);
+              if (chunk.trim()) {
+                emitAnswerEvent('atlas:answer-chunk', {
+                  sessionId,
+                  prompt,
+                  source,
+                  chunk,
+                  type: 'log',
+                  section: payload.section,
+                  title: payload.title,
+                });
+              }
+            } else if (payload.type === 'ERROR') {
+              const message = payload.message || 'Answer mode encountered an error';
+              emitAnswerEvent('atlas:answer-error', { sessionId, prompt, source, error: message });
+              addToast(message, 'error');
+              return;
+            }
+          } catch (error) {
+            console.warn('[AnswerMode] Failed to parse chunk', error);
+          }
+        }
+
+        buffer = segments[segments.length - 1];
+      }
+
+      emitAnswerEvent('atlas:answer-complete', { sessionId, prompt, source, status: 'complete' });
+    } catch (error: any) {
+      const message = error?.message || 'Answer mode request failed';
+      console.error('[AnswerMode] Streaming failed:', message);
+      emitAnswerEvent('atlas:answer-error', { sessionId, prompt, source, error: message });
+      addToast(message, 'error');
+    }
+  };
+
+  const handleChatSubmit = async (
+    prompt: string,
+    options?: { mode?: PromptMode; sessionId?: string; source?: 'cli' | 'prompt' }
+  ) => {
+    const mode = options?.mode ?? chatMode;
+    const source = options?.source ?? 'prompt';
+
+    if (mode === 'ask') {
+      if (!enableAskMode) {
+        addToast('Ask mode is disabled. Enable it from Settings to stream guidance.', 'info');
+        setChatMode('quick');
+        await handleChatSubmit(prompt, { mode: 'quick', sessionId: options?.sessionId, source });
+        return;
+      }
+
+      await handleAnswerPrompt(prompt, { sessionId: options?.sessionId, source });
+      return;
+    }
+
+    const shouldStream = mode === 'quick' || mode === 'think' || isStreamingMode;
+
+    if (shouldStream) {
       handleStartStreaming(prompt);
       return;
     }
 
-    // Add user message to chat
     const userMessage: ChatMessage = {
       role: 'user',
       content: prompt,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
     setChatMessages(prev => [...prev, userMessage]);
-
-    // Switch to chat tab
     setActiveTab('chat');
-
-    // Call the existing generate function
     await handleGenerate(prompt);
   };
+
+  const handleModeChange = useCallback((mode: PromptMode) => {
+    if (mode === 'ask' && !enableAskMode) {
+      addToast('Ask mode is disabled. Enable it from Settings to stream guidance.', 'info');
+      return;
+    }
+    setChatMode(mode);
+  }, [enableAskMode, addToast]);
 
   const pushNotification = useCallback(
     (
@@ -1429,7 +1622,9 @@ export default function Home() {
               {/* Atlas CLI Interface */}
               <div className="flex-1 min-h-0">
                 <AtlasCLI
-                  onCommand={handleChatSubmit}
+                  onCommand={(command, opts) =>
+                    handleChatSubmit(command, { ...opts, source: opts?.source ?? 'cli' })
+                  }
                   isGenerating={isGenerating}
                   generatedCode={generatedCode}
                   executionResult={executionResult}
@@ -1437,6 +1632,9 @@ export default function Home() {
                   onFileModified={handleCliFileModified}
                   onCliActivity={handleCliActivity}
                   githubEnabled={githubEnabled}
+                  activeMode={chatMode}
+                  onModeChange={handleModeChange}
+                  askEnabled={enableAskMode}
                 />
               </div>
             </div>
@@ -1461,24 +1659,40 @@ export default function Home() {
                     <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
                   </TabsList>
 
-                  {/* Streaming Mode Toggle */}
+                  {/* Mode Selection */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setIsStreamingMode(!isStreamingMode)}
-                        className={`px-3 py-1 text-xs rounded transition-colors ${
-                          isStreamingMode
-                            ? 'bg-blue-600 text-white'
-                            : 'text-[var(--muted)] hover:text-white hover:bg-[rgba(51,65,85,0.5)]'
-                        }`}
-                        title="Toggle streaming code generation mode"
-                      >
-                        {isStreamingMode ? '🔄 Streaming Mode' : '⚡ Streaming Mode'}
-                      </button>
-                      {isStreamingMode && (
-                        <span className="text-xs text-blue-400">Real-time code generation</span>
-                      )}
+                      {[
+                        { id: 'quick', label: 'Quick', hint: 'Fast code streaming', disabled: false },
+                        { id: 'think', label: 'Think', hint: 'Plan, research, stream', disabled: false },
+                        { id: 'ask', label: 'Ask', hint: 'Guidance streamed to CLI', disabled: !enableAskMode },
+                      ].map(({ id, label, hint, disabled }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => {
+                            if (disabled || chatMode === (id as PromptMode)) return;
+                            handleModeChange(id as PromptMode);
+                          }}
+                          disabled={disabled}
+                          className={[
+                            'px-3 py-1 text-xs rounded-full border transition-colors',
+                            chatMode === (id as PromptMode)
+                              ? 'border-purple-400 bg-purple-500/20 text-purple-100'
+                              : 'border-slate-700 text-[var(--muted)] hover:border-purple-400 hover:text-white',
+                            disabled ? 'opacity-40 cursor-not-allowed' : '',
+                          ].filter(Boolean).join(' ')}
+                          title={disabled ? `${hint} (Enable Ask Mode in Settings)` : hint}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
+                    <span className="text-xs text-[var(--muted)]">
+                      {chatMode === 'ask'
+                        ? 'Answers stream into the CLI without touching files'
+                        : 'Quick and Think stream code updates into the workspace'}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between">
