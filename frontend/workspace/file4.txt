@@ -1,1 +1,0 @@
-4.  **Link Your Project to Vercel:**

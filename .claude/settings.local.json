@@ -1,31 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -X POST http://localhost:3001/api/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Create a simple hello world function\"\",\"\"activeProvider\"\":\"\"xai\"\",\"\"model\"\":\"\"grok-4-fast-reasoning\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
-      "Bash(curl -X POST http://localhost:3001/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Write a hello world function in JavaScript\"\",\"\"activeProvider\"\":\"\"xai\"\",\"\"model\"\":\"\"grok-4-fast-reasoning\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
-      "Bash(curl -X POST http://localhost:3001/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Write a hello world function in JavaScript\"\",\"\"activeProvider\"\":\"\"openai\"\",\"\"model\"\":\"\"gpt-4o\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
-      "Bash(curl -X POST http://localhost:3001/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Write a hello world function in JavaScript\"\",\"\"activeProvider\"\":\"\"anthropic\"\",\"\"model\"\":\"\"claude-3-5-sonnet-20241022\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
-      "Bash(curl -X POST http://127.0.0.1:3001/llm/generate -H \"Content-Type: application/json\" -d \"{\"\"prompt\"\":\"\"Create a simple counter component\"\",\"\"activeProvider\"\":\"\"google\"\",\"\"model\"\":\"\"gemini-2.5-flash-lite\"\",\"\"routingMode\"\":\"\"single-model\"\"}\")",
-      "Bash(npx tsc:*)",
-      "Bash(npm run build:*)",
-      "Bash(powershell:*)",
-      "Bash(cmd //c:*)",
-      "Bash(tasklist)",
-      "Bash(timeout 30 npm run dev)",
-      "WebSearch",
-      "Read(//e/Dev/vibe-coder/frontend/app/api/generate/**)",
-      "Bash(npm install:*)",
-      "Bash(cat:*)",
-      "Bash(npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
       "Bash(taskkill:*)",
-      "Bash(findstr \"node\")",
-      "Bash(dir)",
-      "Bash(dir:*)",
-      "Bash(curl:*)",
-      "Bash(npm start)",
-      "Bash(for file in *.md)",
-      "Bash(do [ \"$file\" != \"README.md\" ])",
-      "Bash(done)"
+      "Bash(npm run build)",
+      "Bash(npm run dev)"
     ],
     "deny": [],
     "ask": []

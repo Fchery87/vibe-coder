@@ -104,6 +104,7 @@ export default function Home() {
   const enableTickets = useFeatureFlag('enableTickets');
   const enableWorkflows = useFeatureFlag('enableWorkflows');
   const enableAskMode = useFeatureFlag('enableAskMode');
+  const enableAskWebSearch = useFeatureFlag('enableAskWebSearch');
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [originalGeneratedCode, setOriginalGeneratedCode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -781,6 +782,7 @@ export default function Home() {
         body: JSON.stringify({
           prompt,
           mode: 'answer',
+          webSearchEnabled: enableAskWebSearch,
           workspace: workspace
             ? { owner: workspace.owner, repo: workspace.repo, branch: workspace.branch }
             : null,

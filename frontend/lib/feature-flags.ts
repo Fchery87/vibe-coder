@@ -15,7 +15,8 @@ export const FEATURE_FLAGS = {
   enableWorkflows: false,
 
   // Assistant Modes
-  enableAskMode: false,
+  enableAskMode: true,
+  enableAskWebSearch: true,
 
   // Integration Features
   enableGitHubApp: false,
@@ -27,6 +28,38 @@ export const FEATURE_FLAGS = {
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
 
 const STORAGE_KEY = 'vibe-coder-feature-flags';
+const VERSION_KEY = 'vibe-coder-feature-flags-version';
+const CURRENT_VERSION = '2'; // Increment to force migration
+
+/**
+ * Migrate old feature flags to new defaults
+ */
+function migrateFeatureFlags(): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const version = localStorage.getItem(VERSION_KEY);
+    if (version !== CURRENT_VERSION) {
+      // Force update the Ask mode flags
+      const stored = localStorage.getItem(STORAGE_KEY);
+      let flags = FEATURE_FLAGS;
+
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        flags = { ...FEATURE_FLAGS, ...parsed };
+      }
+
+      // Force enable Ask mode features
+      flags = { ...flags, enableAskMode: true, enableAskWebSearch: true };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(flags));
+      localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+      console.log('[FeatureFlags] Migrated to version', CURRENT_VERSION);
+    }
+  } catch (error) {
+    console.error('Failed to migrate feature flags:', error);
+  }
+}
 
 /**
  * Get feature flags from localStorage with fallback to defaults
@@ -35,6 +68,9 @@ export function getFeatureFlags(): typeof FEATURE_FLAGS {
   if (typeof window === 'undefined') {
     return FEATURE_FLAGS;
   }
+
+  // Run migration first
+  migrateFeatureFlags();
 
   try {
     const stored = localStorage.getItem(STORAGE_KEY);

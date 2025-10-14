@@ -1,3 +1,0 @@
-This command will prompt you to link your local project to an existing Vercel project or create a new one.
-
-5.  **Deploy:**

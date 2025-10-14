@@ -1,7 +1,0 @@
-## Project Structure and Vercel Configuration
-
-Vercel automatically detects many project configurations. However, for custom setups, you might need a `vercel.json` file at the root of your project.
-
-### `vercel.json` Example
-
-This file allows you to define build settings, redirects, rewrites, and headers.

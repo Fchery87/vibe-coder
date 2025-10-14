@@ -295,10 +295,322 @@ interface RepoContext {
   hasNext: boolean;
 }
 
+interface GuidanceEntry {
+  id: string;
+  keywords: string[];
+  overview: string;
+  prerequisites?: string[];
+  steps: string[];
+  followUp?: string[];
+  resources?: Array<{ label: string; url: string }>;
+  answerTip?: string;
+}
+
+interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  score?: number;
+}
+
+interface WebSearchPayload {
+  results: WebSearchResult[];
+  answer?: string;
+}
+
+interface AnswerModeOptions {
+  webSearchEnabled?: boolean;
+  searchFn?: (query: string) => Promise<WebSearchPayload | null>;
+}
+
+const searchCache = new Map<string, { expiresAt: number; payload: WebSearchPayload }>();
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+
+const GUIDANCE_LIBRARY: GuidanceEntry[] = [
+  {
+    id: 'clerk-supabase',
+    keywords: ['clerk', 'supabase'],
+    overview:
+      'Use Clerk for authentication and Supabase for database/storage. Rely on Clerk webhooks to keep identity data in sync with Supabase auth tables.',
+    prerequisites: [
+      'Clerk application with published frontend API key and secret key',
+      'Supabase project with `anon` and `service_role` keys',
+      'Edge-friendly runtime (Next.js App Router or Remix) for webhook handling',
+    ],
+    steps: [
+      'Install SDKs: `npm install @clerk/nextjs @supabase/supabase-js`.',
+      'Create a Supabase client helper that reads environment variables for keys and reuses the client across server requests.',
+      "Protect API routes with Clerk's `getAuth` helper; use the returned `userId` when querying Supabase tables so identities stay in sync.",
+      'Enable Clerk webhooks for user.created / user.updated and handle them in `/api/webhooks/clerk` to upsert rows in a Supabase `profiles` table keyed by `clerk_user_id`.',
+      'Configure Supabase Row Level Security policies to allow access when the JWT `sub` (Clerk user ID) matches `clerk_user_id`.',
+      "For local dev, run `npx clerk dev --frontend-api <api>` and `supabase start`. Expose the webhook endpoint via Clerk tunnels or `npx localtunnel --port 3000`.",
+    ],
+    followUp: [
+      'Sync Clerk organization memberships into Supabase tables if you support multi-tenant workspaces.',
+      'Store the Supabase `service_role` key only on the server; never expose it to the browser.',
+      'Add Clerk middleware to inject user data into the Next.js request context for easier access in server components.',
+    ],
+    resources: [
+      { label: 'Clerk webhooks docs', url: 'https://clerk.com/docs/users/sync-data' },
+      { label: 'Supabase RLS guide', url: 'https://supabase.com/docs/guides/auth/row-level-security' },
+      { label: 'Example Next.js integration', url: 'https://github.com/clerkinc/examples/tree/main/nextjs-with-supabase' },
+    ],
+    answerTip:
+      'Pair Clerk for auth UI/session tokens with Supabase for persistence. Webhooks keep identity data canonical while RLS guards tables by Clerk user ID.',
+  },
+];
+
+
+async function fetchWebSearchResults(query: string): Promise<WebSearchPayload | null> {
+  const cacheKey = query.toLowerCase().trim();
+  const cached = searchCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) {
+    return cached.payload;
+  }
+
+  // Try Tavily first if API key is available
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  console.log('[AnswerMode] Tavily API key status:', tavilyKey ? 'Available' : 'Not found');
+
+  if (tavilyKey) {
+    console.log('[AnswerMode] Attempting Tavily search for query:', query);
+    try {
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tavilyKey}`,
+        },
+        body: JSON.stringify({
+          query,
+          max_results: 6,
+          search_depth: 'advanced',
+          include_answer: true,
+        }),
+      });
+
+      if (response.ok) {
+        const data: any = await response.json();
+        const mapped: WebSearchResult[] = Array.isArray(data.results)
+          ? data.results
+              .slice(0, 6)
+              .map((item: any) => ({
+                title: item.title ?? 'Untitled result',
+                url: item.url ?? item.link ?? '',
+                snippet: item.content ?? item.snippet ?? '',
+                score: typeof item.score === 'number' ? item.score : undefined,
+              }))
+              .filter((item: WebSearchResult) => item.url)
+          : [];
+
+        if (mapped.length > 0) {
+          const payload: WebSearchPayload = {
+            results: mapped,
+            answer: typeof data.answer === 'string' && data.answer.trim() ? data.answer.trim() : undefined,
+          };
+
+          searchCache.set(cacheKey, { expiresAt: now + SEARCH_CACHE_TTL, payload });
+          return payload;
+        }
+      } else {
+        console.warn('[AnswerMode] Tavily search failed with status', response.status);
+      }
+    } catch (error) {
+      console.warn('[AnswerMode] Tavily search threw error:', error);
+    }
+  }
+
+  // Fallback to free search using Wikipedia/StackExchange APIs (no API key required)
+  try {
+    console.log('[AnswerMode] Using free search APIs as fallback');
+    const results: WebSearchResult[] = [];
+    let answer = '';
+
+    // Try Wikipedia first for general knowledge
+    const wikiQuery = encodeURIComponent(query);
+    try {
+      const wikiResponse = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${wikiQuery}`,
+        {
+          headers: {
+            'User-Agent': 'VibeCoder/1.0',
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      if (wikiResponse.ok) {
+        const wikiData: any = await wikiResponse.json();
+        if (wikiData.extract && wikiData.content_urls?.desktop?.page) {
+          results.push({
+            title: wikiData.title || 'Wikipedia',
+            url: wikiData.content_urls.desktop.page,
+            snippet: wikiData.extract,
+            score: 1.0,
+          });
+          answer = wikiData.extract;
+        }
+      }
+    } catch (error) {
+      console.warn('[AnswerMode] Wikipedia API failed:', error);
+    }
+
+    // Try DuckDuckGo Instant Answer API
+    try {
+      const ddgQuery = encodeURIComponent(query);
+      const ddgResponse = await fetch(
+        `https://api.duckduckgo.com/?q=${ddgQuery}&format=json&no_html=1&skip_disambig=1`,
+        {
+          headers: {
+            'User-Agent': 'VibeCoder/1.0',
+          },
+        }
+      );
+
+      if (ddgResponse.ok) {
+        const ddgData: any = await ddgResponse.json();
+
+        // Extract instant answer if available
+        if (ddgData.Abstract && ddgData.AbstractURL) {
+          const existing = results.find((r) => r.url === ddgData.AbstractURL);
+          if (!existing) {
+            results.push({
+              title: ddgData.Heading || 'DuckDuckGo Instant Answer',
+              url: ddgData.AbstractURL,
+              snippet: ddgData.Abstract,
+              score: 0.95,
+            });
+            if (!answer) {
+              answer = ddgData.Abstract;
+            }
+          }
+        }
+
+        // Add related topics
+        if (Array.isArray(ddgData.RelatedTopics)) {
+          ddgData.RelatedTopics.slice(0, 4).forEach((topic: any) => {
+            if (topic.FirstURL && topic.Text) {
+              const existing = results.find((r) => r.url === topic.FirstURL);
+              if (!existing) {
+                results.push({
+                  title: topic.Text.split(' - ')[0] || 'Related Topic',
+                  url: topic.FirstURL,
+                  snippet: topic.Text,
+                  score: 0.8,
+                });
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('[AnswerMode] DuckDuckGo API failed:', error);
+    }
+
+    // Add curated technical documentation sources based on query keywords
+    const curatedSources = getCuratedSources(query);
+    results.push(...curatedSources);
+
+    if (results.length === 0) {
+      console.warn('[AnswerMode] No results from free search APIs');
+      return null;
+    }
+
+    const payload: WebSearchPayload = {
+      results: results.slice(0, 6), // Limit to top 6 results
+      answer: answer || undefined,
+    };
+
+    searchCache.set(cacheKey, { expiresAt: now + SEARCH_CACHE_TTL, payload });
+    return payload;
+  } catch (error) {
+    console.warn('[AnswerMode] Free search APIs threw error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get curated documentation sources based on query keywords
+ */
+function getCuratedSources(query: string): WebSearchResult[] {
+  const queryLower = query.toLowerCase();
+  const sources: WebSearchResult[] = [];
+
+  // 3D Printing / Klipper
+  if (queryLower.includes('klipper') || queryLower.includes('3d print') || queryLower.includes('ender')) {
+    sources.push({
+      title: 'Klipper Documentation - Installation',
+      url: 'https://www.klipper3d.org/Installation.html',
+      snippet: 'Official Klipper firmware installation guide with step-by-step instructions for setting up Klipper on your 3D printer including Ender 3 Pro.',
+      score: 1.0,
+    });
+    sources.push({
+      title: 'Klipper Configuration Reference',
+      url: 'https://www.klipper3d.org/Config_Reference.html',
+      snippet: 'Complete configuration reference for Klipper firmware including all available settings and parameters for your printer.',
+      score: 0.95,
+    });
+  }
+
+  // React / Next.js
+  if (queryLower.includes('react') || queryLower.includes('next')) {
+    sources.push({
+      title: 'React Documentation',
+      url: 'https://react.dev/learn',
+      snippet: 'Official React documentation with tutorials, guides, and API reference for building user interfaces.',
+      score: 1.0,
+    });
+    if (queryLower.includes('next')) {
+      sources.push({
+        title: 'Next.js Documentation',
+        url: 'https://nextjs.org/docs',
+        snippet: 'Official Next.js documentation covering app router, server components, routing, and deployment.',
+        score: 1.0,
+      });
+    }
+  }
+
+  // Authentication
+  if (queryLower.includes('auth') || queryLower.includes('clerk') || queryLower.includes('supabase')) {
+    if (queryLower.includes('clerk')) {
+      sources.push({
+        title: 'Clerk Documentation',
+        url: 'https://clerk.com/docs',
+        snippet: 'Complete guide to implementing authentication with Clerk including user management, webhooks, and integrations.',
+        score: 1.0,
+      });
+    }
+    if (queryLower.includes('supabase')) {
+      sources.push({
+        title: 'Supabase Auth Documentation',
+        url: 'https://supabase.com/docs/guides/auth',
+        snippet: 'Supabase authentication guide covering email, OAuth, row-level security, and user management.',
+        score: 1.0,
+      });
+    }
+  }
+
+  // Deployment
+  if (queryLower.includes('vercel') || queryLower.includes('deploy')) {
+    sources.push({
+      title: 'Vercel Documentation',
+      url: 'https://vercel.com/docs',
+      snippet: 'Complete guide to deploying applications on Vercel including environment variables, domains, and CI/CD.',
+      score: 1.0,
+    });
+  }
+
+  return sources;
+}
+
 class AnswerModeGenerator {
   private readonly promptLower: string;
 
-  constructor(private readonly prompt: string) {
+  constructor(
+    private readonly prompt: string,
+    private readonly options: AnswerModeOptions = {}
+  ) {
     this.promptLower = prompt.toLowerCase();
   }
 
@@ -468,16 +780,159 @@ class AnswerModeGenerator {
       {
         type: 'ANSWER',
         chunk:
-          'Review the repo README and existing npm scripts to adapt these steps to your request. Ask again with more specifics to receive a tailored runbook.\n',
+        'Review the repo README and existing npm scripts to adapt these steps to your request. Ask again with more specifics to receive a tailored runbook.\n',
       },
     ];
   }
 
+  private findGuidanceEntry(): GuidanceEntry | null {
+    for (const entry of GUIDANCE_LIBRARY) {
+      const matches = entry.keywords.every((keyword) => this.promptLower.includes(keyword));
+      if (matches) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  private buildGuidedSections(entry: GuidanceEntry, context: RepoContext): StreamMessage[] {
+    const sections: StreamMessage[] = [];
+
+    sections.push({
+      type: 'LOG',
+      kind: 'overview',
+      title: 'Overview',
+      text: entry.overview,
+    });
+
+    const prereqs = [
+      ...(entry.prerequisites ?? []),
+      context.envKeys.length
+        ? `Set environment variables: ${context.envKeys.slice(0, 8).join(', ')}${context.envKeys.length > 8 ? ', ...' : ''}`
+        : 'Review `.env.example` and configure secrets for Clerk and Supabase.',
+    ];
+
+    sections.push({
+      type: 'LOG',
+      kind: 'prerequisites',
+      title: 'Prerequisites',
+      items: prereqs,
+    });
+
+    sections.push({
+      type: 'LOG',
+      kind: 'steps',
+      title: 'Implementation Steps',
+      items: entry.steps,
+    });
+
+    if (entry.followUp?.length) {
+      sections.push({
+        type: 'LOG',
+        kind: 'nextSteps',
+        title: 'Next Steps',
+        items: entry.followUp,
+      });
+    }
+
+    if (entry.resources?.length) {
+      sections.push({
+        type: 'LOG',
+        kind: 'resources',
+        title: 'References',
+        items: entry.resources.map((resource) => `${resource.label}: ${resource.url}`),
+      });
+    }
+
+    sections.push({
+      type: 'ANSWER',
+      chunk: `${entry.answerTip ?? 'Follow the steps above to complete the integration.'}\n`,
+    });
+
+    return sections;
+  }
+
+  private buildWebSearchSections(payload: WebSearchPayload, context: RepoContext): StreamMessage[] {
+    const sections: StreamMessage[] = [];
+
+    sections.push({
+      type: 'LOG',
+      kind: 'overview',
+      title: 'Live Web Findings',
+      text: `Relevant sources discovered for “${this.prompt}”. Validate details against official documentation before shipping changes.`,
+    });
+
+    sections.push({
+      type: 'LOG',
+      kind: 'resources',
+      title: 'Top Sources',
+      items: payload.results.slice(0, 5).map((result, index) => `${index + 1}. ${result.title} — ${result.url}`),
+    });
+
+    const snippets = payload.results
+      .map((result) => result.snippet?.trim())
+      .filter((snippet) => snippet && snippet.length > 0)
+      .slice(0, 5)
+      .map((snippet) => (snippet!.length > 320 ? `${snippet!.slice(0, 317)}…` : snippet!));
+
+    if (snippets.length > 0) {
+      sections.push({
+        type: 'LOG',
+        kind: 'insights',
+        title: 'Key Notes',
+        items: snippets,
+      });
+    }
+
+    const topSources = payload.results.slice(0, 3).map((result) => result.url).join(', ');
+
+    sections.push({
+      type: 'ANSWER',
+      chunk:
+        (payload.answer
+          ? `${payload.answer}\n`
+          : `Use the sources above to guide implementation. Focus on the first result for a step-by-step walkthrough.\n`) +
+        `\nSources referenced: ${topSources}\n`,
+    });
+
+    return sections;
+  }
+
   async *generateStream(): AsyncGenerator<StreamMessage> {
     const context = await this.loadContext();
-    const sections = this.isVercelQuestion()
-      ? this.buildVercelSections(context)
-      : this.buildGenericSections(context);
+    let sections: StreamMessage[] | null = null;
+    let searchFallback = false;
+
+    const guidedEntry = this.findGuidanceEntry();
+    if (guidedEntry) {
+      sections = this.buildGuidedSections(guidedEntry, context);
+    } else if (this.isVercelQuestion()) {
+      sections = this.buildVercelSections(context);
+    } else if (this.options.webSearchEnabled && this.options.searchFn) {
+      try {
+        const payload = await this.options.searchFn(this.prompt);
+        if (payload && payload.results.length > 0) {
+          sections = this.buildWebSearchSections(payload, context);
+        } else {
+          searchFallback = true;
+        }
+      } catch (error) {
+        console.warn('[AnswerMode] Web search retrieval failed:', error);
+        searchFallback = true;
+      }
+    }
+
+    if (!sections) {
+      sections = this.buildGenericSections(context);
+      if (searchFallback) {
+        sections.unshift({
+          type: 'LOG',
+          kind: 'notice',
+          title: 'Web Search',
+          text: 'No live sources returned for this query. Showing repository guidance instead.',
+        });
+      }
+    }
 
     for (const section of sections) {
       yield section;
@@ -491,7 +946,7 @@ class AnswerModeGenerator {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, model, provider, routingMode, mode } = body;
+    const { prompt, model, provider, routingMode, mode, webSearchEnabled } = body;
 
     if (!prompt) {
       return new Response('Prompt is required', { status: 400 });
@@ -502,21 +957,27 @@ export async function POST(request: NextRequest) {
     const modeType = typeof mode === 'string' ? mode.toLowerCase() : 'build';
 
     if (modeType === 'answer') {
-      const generator = new AnswerModeGenerator(prompt);
+      const generator = new AnswerModeGenerator(prompt, {
+        webSearchEnabled: Boolean(webSearchEnabled),
+        searchFn: fetchWebSearchResults,
+      });
+      const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
           try {
             for await (const message of generator.generateStream()) {
-              controller.enqueue('data: ' + JSON.stringify(message) + '\n\n');
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify(message)}\n\n`)
+              );
             }
           } catch (error: any) {
             controller.enqueue(
-              'data: ' +
-                JSON.stringify({
+              encoder.encode(
+                `data: ${JSON.stringify({
                   type: 'ERROR',
                   message: error?.message || 'Failed to generate answer response',
-                }) +
-                '\n\n'
+                })}\n\n`
+              )
             );
           } finally {
             controller.close();
