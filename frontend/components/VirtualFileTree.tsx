@@ -19,6 +19,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Button } from "@/components/ui/button";
 
 interface FileNode {
   id: string;
@@ -128,22 +129,24 @@ export default function VirtualFileTree({
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={expandAll}
-            className="btn text-xs"
+            variant="secondary"
+            size="sm"
             type="button"
             title="Expand all"
           >
             Expand
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={collapseAll}
-            className="btn text-xs"
+            variant="secondary"
+            size="sm"
             type="button"
             title="Collapse all"
           >
             Collapse
-          </button>
+          </Button>
         </div>
       </div>
 

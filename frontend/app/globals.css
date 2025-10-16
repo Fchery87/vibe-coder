@@ -131,29 +131,6 @@ p, span, li {
   backdrop-filter: blur(12px);
 }
 
-.btn {
-  height: 30px;
-  padding: 0 var(--gap-3);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #0f1421;
-  color: var(--text);
-  font-size: var(--size-small);
-  font-weight: 500;
-  line-height: 1;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
-}
-
-.btn:hover {
-  border-color: #334155;
-  color: #f8fafc;
-}
-
-.btn[disabled] {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .chip {
   display: inline-flex;
   align-items: center;
@@ -653,41 +630,6 @@ kbd {
 }
 
 /* Phase 2: Micro-interactions & Polish */
-
-/* Smooth button hover effects */
-.btn, button[class*="btn"] {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.btn:hover, button[class*="btn"]:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
-}
-
-.btn:active, button[class*="btn"]:active {
-  transform: translateY(0);
-}
-
-/* Ripple effect for clicks */
-.btn::before, button[class*="btn"]::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  transform: translate(-50%, -50%);
-  transition: width 0.4s, height 0.4s;
-}
-
-.btn:active::before, button[class*="btn"]:active::before {
-  width: 100px;
-  height: 100px;
-}
 
 /* Smooth expand/collapse animations */
 @keyframes slideDown {

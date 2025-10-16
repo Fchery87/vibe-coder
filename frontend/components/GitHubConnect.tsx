@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Github, LogOut, AlertCircle } from 'lucide-react';
 import { GitHubUser } from '@/lib/github-types';
+import { Button } from "@/components/ui/button";
 
 interface GitHubConnectProps {
   onConnect?: () => void;
@@ -66,10 +67,10 @@ export default function GitHubConnect({ onConnect, onDisconnect }: GitHubConnect
 
   if (loading) {
     return (
-      <button className="btn" disabled>
+      <Button variant="secondary" size="sm" disabled>
         <Github className="icon animate-pulse" />
         <span>Connecting...</span>
-      </button>
+      </Button>
     );
   }
 
@@ -93,21 +94,22 @@ export default function GitHubConnect({ onConnect, onDisconnect }: GitHubConnect
           />
           <span className="text-sm text-[var(--text)]">{user.login}</span>
         </div>
-        <button
+        <Button
           onClick={handleLogout}
-          className="btn"
+          variant="ghost"
+          size="icon"
           title="Disconnect GitHub"
         >
           <LogOut className="icon" />
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <button onClick={handleLogin} className="btn">
+    <Button onClick={handleLogin} variant="secondary" size="sm">
       <Github className="icon" />
       <span>Connect GitHub</span>
-    </button>
+    </Button>
   );
 }

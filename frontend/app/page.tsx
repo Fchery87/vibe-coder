@@ -13,6 +13,7 @@ import ModelFeedbackLoop from "@/components/ModelFeedbackLoop";
 import ThemeToggle from "@/components/ThemeToggle";
 import WorkspaceShell from "@/components/layout/WorkspaceShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import HeaderBar from "@/components/HeaderBar";
 import SettingsModal from "@/components/SettingsModal";
 import ToolDrawer, { type ToolDrawerTab } from "@/components/ToolDrawer";
@@ -1398,9 +1399,9 @@ export default function Home() {
           <p className="text-sm text-[var(--muted)]">
             Access project integrations, feature flags, and UI preferences without leaving the workspace.
           </p>
-          <button type="button" className="btn" onClick={() => setIsSettingsOpen(true)}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => setIsSettingsOpen(true)}>
             Open Settings Modal
-          </button>
+          </Button>
         </div>
       ),
     });

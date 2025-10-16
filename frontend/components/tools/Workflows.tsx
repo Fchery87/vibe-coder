@@ -9,6 +9,7 @@ import ToolDrawerPanel, {
 import { Play, RefreshCw } from "lucide-react";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import WorkflowRunCard from "@/components/WorkflowRunCard";
+import { Button } from "@/components/ui/button";
 
 interface Workflow {
   id: number;
@@ -253,16 +254,18 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
               onChange={(e) => setRefInput(e.target.value)}
             />
 
-            <button
+            <Button
               type="button"
-              className="btn"
+              variant="secondary"
+              size="sm"
+              className="gap-1"
               onClick={trigger}
               disabled={isDispatching || !selected || actionsDisabled}
               title={actionsDisabled ? "Actions disabled" : "Trigger workflow"}
             >
               {isDispatching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               <span className="ml-1">Run</span>
-            </button>
+            </Button>
           </div>
 
           {/* Optional inputs for workflow dispatch */}

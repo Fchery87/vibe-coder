@@ -7,9 +7,9 @@
 - Updated Notification Center, FileTree, Theme toggle, and Command surfaces to share the new token bridge.
 - Consolidated duplicate component trees into `frontend/components` and removed the legacy `app/components` copies; backend/documentation paths now point to the shared library.
 - Extracted a `WorkspaceShell` layout from `frontend/app/page.tsx` so the primary editor, assistant timeline, and utility rail are isolated modules.
+- Retired bespoke `.btn` utilities by migrating callers to the shared shadcn `<Button>` and pruning the legacy styles from `globals.css`.
 
 ## Phase 1 - Layout Foundations
-- Remove bespoke utility classes (e.g. `.btn`, panel gradients) now superseded by shadcn to reduce CSS surface area.
 - Eliminate the legacy `FileTree` gating once the `Explorer` flag is stable; keep the fallback behind an opt-in flag only.
 - Break the `Home` page into feature slices (header, timeline, workspace shell) so streaming logic and state management are easier to maintain.
 

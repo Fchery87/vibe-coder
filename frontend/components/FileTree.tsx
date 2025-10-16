@@ -11,6 +11,7 @@ import {
   Gauge,
   RefreshCw
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface FileNode {
   id: string;
@@ -106,23 +107,25 @@ export default function FileTree({ onFileSelect, onContextAction }: FileTreeProp
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={fetchFiles}
-            className="btn p-2"
+            variant="secondary"
+            size="icon"
             type="button"
             title="Refresh files"
             disabled={isLoading}
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={toggleAllFolders}
-            className="btn"
+            variant="secondary"
+            size="sm"
             type="button"
             title={allCollapsed ? "Expand all" : "Collapse all"}
           >
             {allCollapsed ? 'Expand' : 'Collapse'}
-          </button>
+          </Button>
         </div>
       </div>
 

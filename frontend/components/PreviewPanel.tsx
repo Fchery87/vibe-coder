@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Share2, Copy, Check, ExternalLink, RefreshCw, Eye } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 interface PreviewPanelProps {
   generatedCode?: string;
@@ -253,26 +254,30 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
               <span><span className="text-[var(--muted)]">provider</span><strong>{metadata?.provider}</strong></span>
             )}
           </div>
-          <button
+          <Button
             onClick={reloadPreview}
             disabled={!generatedCode}
-            className="btn flex items-center gap-[var(--gap-2)]"
+            variant="secondary"
+            size="sm"
             type="button"
             title="Reload preview"
+            className="gap-[var(--gap-2)]"
           >
             <RefreshCw className="w-3 h-3" />
             <span className="hidden sm:inline">Reload</span>
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleShare}
             disabled={isSharing || (!generatedCode && !executionResult)}
-            className="btn flex items-center gap-[var(--gap-2)]"
+            variant="secondary"
+            size="sm"
             type="button"
             title="Share preview"
+            className="gap-[var(--gap-2)]"
           >
             <Share2 className="w-3 h-3" />
             <span className="hidden sm:inline">{isSharing ? 'Sharing...' : 'Share'}</span>
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -286,12 +291,12 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
               </p>
             </div>
             <div className="flex flex-col gap-[var(--gap-2)]">
-              <button onClick={handleCopyLink} className="btn" type="button">
+              <Button onClick={handleCopyLink} type="button" size="icon" variant="secondary">
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              </button>
-              <button onClick={() => shareUrl && window.open(shareUrl, '_blank')} className="btn" type="button">
+              </Button>
+              <Button onClick={() => shareUrl && window.open(shareUrl, '_blank')} type="button" size="icon" variant="secondary">
                 <ExternalLink className="w-3 h-3" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -315,15 +320,16 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
                   <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]"></span>
                 </div>
                 <span className="flex-1 text-[var(--muted)] text-[var(--size-small)] font-mono truncate">sandbox.vibe-coder.dev</span>
-                <button
+                <Button
                   onClick={reloadPreview}
                   disabled={!generatedCode}
-                  className="btn"
+                  variant="ghost"
+                  size="icon"
                   type="button"
                   title="Reload preview"
                 >
                   <RefreshCw className="w-3 h-3" />
-                </button>
+                </Button>
               </div>
 
               <div className="flex-1 bg-[rgba(9,12,24,0.9)]">
@@ -340,7 +346,9 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
                     <Eye className="w-10 h-10 text-[var(--muted)]" />
                     <h3>Interactive Preview</h3>
                     <p>Generate code to see live output from the sandbox.</p>
-                    <a className="btn" href="https://docs.vibe-coder.dev/sandbox" target="_blank" rel="noreferrer">Learn how</a>
+                    <Button asChild variant="secondary" size="sm">
+                      <a href="https://docs.vibe-coder.dev/sandbox" target="_blank" rel="noreferrer">Learn how</a>
+                    </Button>
                   </div>
                 )}
               </div>

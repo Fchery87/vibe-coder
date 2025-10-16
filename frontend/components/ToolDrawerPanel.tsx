@@ -8,6 +8,7 @@
 
 import { Component, ReactNode } from 'react';
 import { AlertCircle, Settings } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 interface ToolDrawerPanelProps {
   children: ReactNode;
@@ -48,13 +49,13 @@ class ToolDrawerPanel extends Component<ToolDrawerPanelProps, ToolDrawerPanelSta
           <p className="text-sm text-[var(--muted)] mb-4">
             {this.state.error?.message || 'Something went wrong'}
           </p>
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={() => this.setState({ hasError: false })}
-            className="btn text-sm"
           >
             Try Again
-          </button>
+          </Button>
         </div>
       );
     }
@@ -90,9 +91,9 @@ export function ToolEmptyState({
       <h3 className="text-lg font-medium text-[var(--text)] mb-2">{title}</h3>
       <p className="text-sm text-[var(--muted)] mb-4 max-w-sm">{description}</p>
       {actionLabel && onAction && (
-        <button type="button" onClick={onAction} className="btn text-sm">
+        <Button type="button" onClick={onAction} size="sm">
           {actionLabel}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -136,9 +137,9 @@ export function ToolErrorState({
       <h3 className="text-lg font-medium text-[var(--text)] mb-2">{title}</h3>
       <p className="text-sm text-[var(--muted)] mb-4 max-w-sm">{message}</p>
       {onRetry && (
-        <button type="button" onClick={onRetry} className="btn text-sm">
+        <Button type="button" onClick={onRetry} size="sm">
           Retry
-        </button>
+        </Button>
       )}
     </div>
   );
