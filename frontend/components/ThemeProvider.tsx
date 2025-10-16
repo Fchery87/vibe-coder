@@ -39,13 +39,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  if (!mounted) {
-    return <div style={{ visibility: 'hidden' }}>{children}</div>;
-  }
-
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      {children}
+      {mounted ? (
+        children
+      ) : (
+        <div style={{ visibility: 'hidden' }}>{children}</div>
+      )}
     </ThemeContext.Provider>
   );
 }
@@ -57,4 +57,3 @@ export function useTheme() {
   }
   return context;
 }
-

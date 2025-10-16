@@ -155,7 +155,7 @@ export default function ToolDrawer({
             orientation="vertical"
             value={highlightedTab}
             onValueChange={handleToggleChange}
-            className="gap-1 p-2"
+            className="flex flex-col gap-1 p-2"
           >
             {tabs.map((tab) => (
               <Tooltip key={tab.id}>
