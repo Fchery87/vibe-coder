@@ -36,7 +36,8 @@ interface SourceControlProps {
   installationId?: number;
   tabs?: Array<{
     id: string;
-    path: string;
+    path?: string;
+    filePath?: string;
     content: string;
     originalContent?: string;
     sha?: string;
@@ -53,6 +54,15 @@ export default function SourceControl({
   tabs = [],
   onNotification,
 }: SourceControlProps) {
+  const normalizedTabs = useMemo(
+    () =>
+      tabs.map((tab) => ({
+        ...tab,
+        path: tab.path ?? tab.filePath ?? '',
+      })),
+    [tabs]
+  );
+
   const {
     changedFiles,
     branches,
@@ -63,7 +73,7 @@ export default function SourceControl({
     createBranch,
     commitChanges,
     switchBranch,
-  } = useGitStatus({ owner, repo, branch, installationId, tabs });
+  } = useGitStatus({ owner, repo, branch, installationId, tabs: normalizedTabs });
 
   const [commitMessage, setCommitMessage] = useState('');
   const [showBranchDialog, setShowBranchDialog] = useState(false);

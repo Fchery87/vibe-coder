@@ -4,6 +4,10 @@
 - Extract a `WorkspaceShell` layout from `frontend/app/page.tsx` to separate primary editor, assistant timeline, and utility rail.
 - Refactor `ToolDrawer` into a persistent vertical rail with icon-only default state, hover previews, and consistent badge visibility.
 - Centralize theme tokens (dark/light palettes, typography, spacing) in a shared provider so Monaco and global UI share gradients, depth, and shadows.
+- Adopt shadcn/ui primitives for shared affordances; begin migrating high-visibility actions (e.g., header buttons) to the new component set.
+- Convert modal, select, and toggle controls (workspace settings, repo picker) to shadcn/dialog, select, and switch primitives for consistent interaction patterns.
+- Migrate transient surfaces (toast system, file tree context menu, theme switcher) onto shadcn Sonner/context/dropdown primitives to standardize interactions.
+- Replace ToolDrawer rail interactions with shadcn toggle group + tooltips for consistent selection and hover previews.
 - Remove conditional rendering of the legacy `FileTree` once the `Explorer` flag is enabled; keep the legacy component behind a feature flag only.
 
 ## Phase 2 – Interaction Enhancements

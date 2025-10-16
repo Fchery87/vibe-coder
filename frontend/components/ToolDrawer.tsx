@@ -8,6 +8,9 @@
 
 import { useState, ReactNode, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 export interface ToolDrawerTab {
   id: string;
@@ -42,6 +45,7 @@ export default function ToolDrawer({
 
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
   const hoveredTabData = tabs.find((tab) => tab.id === hoveredTab);
+  const highlightedTab = hoveredTab ?? activeTab;
 
   // Show preview when hovering over an icon
   const handleIconHover = (tabId: string) => {
@@ -136,94 +140,103 @@ export default function ToolDrawer({
 
   const showPreview = !isPinned && hoveredTab && !collapsed;
   const showPinnedContent = isPinned && !collapsed;
+  const handleToggleChange = (nextValue: string) => {
+    if (!nextValue) return;
+    handleIconClick(nextValue);
+  };
 
   return (
-    <div className="flex relative">
-      {/* Vertical Icon Rail - Always Visible */}
-      <div className="panel flex flex-col w-12 border-r border-[var(--border)] bg-[var(--panel)] z-20">
-        <div className="flex flex-col gap-1 p-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onMouseEnter={() => handleIconHover(tab.id)}
-              onMouseLeave={handleIconLeave}
-              onClick={() => handleIconClick(tab.id)}
-              className={`relative p-2 rounded transition-all duration-200 ${
-                activeTab === tab.id && (isPinned || hoveredTab === tab.id)
-                  ? 'bg-purple-500/20 text-purple-400'
-                  : 'text-[var(--muted)] hover:bg-slate-700/30 hover:text-[var(--text)]'
-              }`}
-              title={tab.label}
-            >
-              {tab.icon}
-              {tab.badge !== undefined && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] bg-purple-500 text-white rounded-full font-medium">
-                  {typeof tab.badge === 'number' && tab.badge > 9 ? '9+' : tab.badge}
-                </span>
-              )}
-            </button>
-          ))}
+    <TooltipProvider delayDuration={100}>
+      <div className="relative flex">
+        {/* Vertical Icon Rail - Always Visible */}
+        <div className="panel z-20 flex w-12 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
+          <ToggleGroup
+            type="single"
+            orientation="vertical"
+            value={highlightedTab}
+            onValueChange={handleToggleChange}
+            className="gap-1 p-2"
+          >
+            {tabs.map((tab) => (
+              <Tooltip key={tab.id}>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem
+                    value={tab.id}
+                    size="sm"
+                    className="relative w-full justify-center rounded-lg border border-transparent text-[var(--muted)] transition-all data-[state=on]:border-purple-400/40 data-[state=on]:bg-purple-500/20 data-[state=on]:text-purple-200 hover:bg-slate-700/30 hover:text-[var(--text)]"
+                    onMouseEnter={() => handleIconHover(tab.id)}
+                    onMouseLeave={handleIconLeave}
+                    aria-label={tab.label}
+                  >
+                    {tab.icon}
+                    {tab.badge !== undefined && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-purple-500 px-1 text-[10px] font-medium text-white">
+                        {typeof tab.badge === 'number' && tab.badge > 9 ? '9+' : tab.badge}
+                      </span>
+                    )}
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs font-medium">
+                  {tab.label}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </ToggleGroup>
         </div>
-      </div>
 
       {/* Hover Preview - Floating Panel */}
-      {showPreview && hoveredTabData && (
-        <div
-          className="absolute left-12 top-0 bottom-0 w-80 panel border-r border-[var(--border)] bg-[var(--panel)] shadow-2xl z-10 animate-in fade-in-0 slide-in-from-left-2 duration-150"
-          onMouseEnter={handlePreviewEnter}
-          onMouseLeave={handlePreviewLeave}
-        >
-          {/* Preview Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
+        {showPreview && hoveredTabData && (
+          <div
+            className="panel absolute left-12 top-0 bottom-0 z-10 w-80 border-r border-[var(--border)] bg-[var(--panel)] shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150"
+            onMouseEnter={handlePreviewEnter}
+            onMouseLeave={handlePreviewLeave}
+          >
+            <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
               {hoveredTabData.icon}
               <span className="text-sm font-medium">{hoveredTabData.label}</span>
               {hoveredTabData.badge !== undefined && (
-                <span className="px-1.5 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded">
+                <Badge variant="outline" className="border-purple-400/40 bg-purple-500/10 text-purple-200">
                   {hoveredTabData.badge}
-                </span>
+                </Badge>
               )}
             </div>
+            <div className="h-full flex-1 overflow-auto">{hoveredTabData.content}</div>
           </div>
-
-          {/* Preview Content */}
-          <div className="flex-1 overflow-auto h-full">
-            {hoveredTabData.content}
-          </div>
-        </div>
-      )}
+        )}
 
       {/* Pinned Content - Full Panel */}
-      {showPinnedContent && activeTabData && (
-        <div className="w-80 panel border-r border-[var(--border)] bg-[var(--panel)] flex flex-col">
-          {/* Pinned Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              {activeTabData.icon}
-              <span className="text-sm font-medium">{activeTabData.label}</span>
-              {activeTabData.badge !== undefined && (
-                <span className="px-1.5 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded">
-                  {activeTabData.badge}
-                </span>
-              )}
+        {showPinnedContent && activeTabData && (
+          <div className="panel flex w-80 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+              <div className="flex items-center gap-2">
+                {activeTabData.icon}
+                <span className="text-sm font-medium">{activeTabData.label}</span>
+                {activeTabData.badge !== undefined && (
+                  <Badge variant="outline" className="border-purple-400/40 bg-purple-500/10 text-purple-200">
+                    {activeTabData.badge}
+                  </Badge>
+                )}
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="rounded p-1 transition-colors hover:bg-slate-700/30"
+                    aria-label="Close sidebar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="text-xs">
+                  Close sidebar
+                </TooltipContent>
+              </Tooltip>
             </div>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="p-1 hover:bg-slate-700/30 rounded transition-colors"
-              title="Close sidebar"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex-1 overflow-auto">{activeTabData.content}</div>
           </div>
-
-          {/* Pinned Content */}
-          <div className="flex-1 overflow-auto">
-            {activeTabData.content}
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

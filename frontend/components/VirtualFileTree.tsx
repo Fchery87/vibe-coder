@@ -13,6 +13,12 @@ import {
   Gauge,
   GitBranch,
 } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 interface FileNode {
   id: string;
@@ -40,9 +46,6 @@ export default function VirtualFileTree({
 }: VirtualFileTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [activePath, setActivePath] = useState<string | null>(null);
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
-  const [contextMenuItem, setContextMenuItem] = useState<FlattenedNode | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
   const flattenedItems = useMemo(() => {
@@ -91,20 +94,8 @@ export default function VirtualFileTree({
     }
   };
 
-  const handleContextMenu = (e: React.MouseEvent, item: FlattenedNode) => {
-    if (item.type === "file") {
-      e.preventDefault();
-      setContextMenuPos({ x: e.clientX, y: e.clientY });
-      setContextMenuItem(item);
-      setShowContextMenu(true);
-    }
-  };
-
-  const handleContextAction = (action: string) => {
-    if (contextMenuItem) {
-      onContextAction?.(action, contextMenuItem.name);
-      setShowContextMenu(false);
-    }
+  const handleContextAction = (action: string, item: FlattenedNode) => {
+    onContextAction?.(action, item.name);
   };
 
   const expandAll = () => {
@@ -186,77 +177,71 @@ export default function VirtualFileTree({
               >
                 <div className="file-row">
                   <div className="bar"></div>
-                  <button
-                    type="button"
-                    className="col-span-2 flex items-center justify-between gap-[var(--gap-3)] text-left w-full py-1.5 px-2 rounded hover:bg-slate-700/30 transition-colors"
-                    style={{ paddingLeft: `${paddingLeft + 8}px` }}
-                    onClick={() => handleItemClick(item)}
-                    onContextMenu={(e) => handleContextMenu(e, item)}
-                  >
-                    <div className="flex items-center gap-[var(--gap-2)] min-w-0 flex-1">
-                      {item.type === "folder" ? (
-                        item.isExpanded ? (
-                          <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
-                        ) : (
-                          <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
-                        )
-                      ) : (
-                        <FileText className="w-3.5 h-3.5 text-[var(--muted)] flex-shrink-0" />
-                      )}
-                      <span className={`truncate ${isActive ? "text-[var(--accent-2)]" : ""}`}>
-                        {item.name}
-                      </span>
-                    </div>
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="col-span-2 flex items-center justify-between gap-[var(--gap-3)] text-left w-full py-1.5 px-2 rounded hover:bg-slate-700/30 transition-colors"
+                        style={{ paddingLeft: `${paddingLeft + 8}px` }}
+                        onClick={() => handleItemClick(item)}
+                      >
+                        <div className="flex items-center gap-[var(--gap-2)] min-w-0 flex-1">
+                          {item.type === "folder" ? (
+                            item.isExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+                            )
+                          ) : (
+                            <FileText className="w-3.5 h-3.5 text-[var(--muted)] flex-shrink-0" />
+                          )}
+                          <span className={`truncate ${isActive ? "text-[var(--accent-2)]" : ""}`}>
+                            {item.name}
+                          </span>
+                        </div>
 
+                        {item.type === "file" && (
+                          <div className="flex items-center gap-[var(--gap-2)] text-[var(--muted)]">
+                            <Sparkles className="w-3 h-3" />
+                            <Wrench className="w-3 h-3" />
+                            <TestTube className="w-3 h-3" />
+                            <Gauge className="w-3 h-3" />
+                          </div>
+                        )}
+                      </button>
+                    </ContextMenuTrigger>
                     {item.type === "file" && (
-                      <div className="flex items-center gap-[var(--gap-2)] text-[var(--muted)]">
-                        <Sparkles className="w-3 h-3" />
-                        <Wrench className="w-3 h-3" />
-                        <TestTube className="w-3 h-3" />
-                        <Gauge className="w-3 h-3" />
-                      </div>
+                      <ContextMenuContent className="w-48">
+                        <ContextMenuItem
+                          onSelect={() => handleContextAction("open", item)}
+                          className="flex items-center gap-2"
+                        >
+                          <Folder className="w-3.5 h-3.5" />
+                          Open in new tab
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          onSelect={() => handleContextAction("compare", item)}
+                          className="flex items-center gap-2"
+                        >
+                          <GitBranch className="w-3.5 h-3.5" />
+                          Compare changes
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          onSelect={() => handleContextAction("open-explorer", item)}
+                          className="flex items-center gap-2"
+                        >
+                          <Folder className="w-3.5 h-3.5" />
+                          Open in Explorer
+                        </ContextMenuItem>
+                      </ContextMenuContent>
                     )}
-                  </button>
+                  </ContextMenu>
                 </div>
               </div>
             );
           })}
         </div>
       </div>
-
-      {showContextMenu && contextMenuItem && (
-        <div
-          className="fixed z-50 w-48 rounded-md border border-slate-700 bg-slate-900/95 p-1 shadow-lg backdrop-blur-sm"
-          style={{ top: contextMenuPos.y, left: contextMenuPos.x }}
-          role="menu"
-          onMouseLeave={() => setShowContextMenu(false)}
-        >
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-            onClick={() => handleContextAction("open")}
-          >
-            <Folder className="w-3.5 h-3.5" />
-            Open in new tab
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-            onClick={() => handleContextAction("compare")}
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-            Compare changes
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-            onClick={() => handleContextAction("open-explorer")}
-          >
-            <Folder className="w-3.5 h-3.5" />
-            Open in Explorer
-          </button>
-        </div>
-      )}
     </div>
   );
 }

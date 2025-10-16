@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
   /* Color system */
   --bg: #0b1020;
@@ -34,24 +38,37 @@
   --bottom-h: 76px;
 
   /* Tailwind-compatible semantic tokens */
-  --background: 224 71% 6%;
-  --foreground: 210 40% 96%;
-  --muted-foreground: 215 20% 65%;
-  --popover: 224 71% 6%;
-  --popover-foreground: 210 40% 96%;
-  --card: 220 40% 12%;
-  --card-foreground: 210 40% 96%;
+  --background: var(--bg);
+  --foreground: var(--text);
+  --muted-foreground: rgba(148, 163, 184, 0.75);
+  --popover: var(--panel);
+  --popover-foreground: var(--text);
+  --card: var(--panel);
+  --card-foreground: var(--text);
   --border-hsl: 215 28% 23%;
-  --input: 215 28% 23%;
-  --primary: 262 83% 58%;
-  --primary-foreground: 210 20% 98%;
-  --secondary: 215 28% 18%;
-  --secondary-foreground: 210 40% 96%;
+  --input: var(--border);
+  --primary: var(--accent);
+  --primary-foreground: var(--text);
+  --secondary: var(--panel);
+  --secondary-foreground: var(--text);
   --accent-hsl: 215 28% 18%;
-  --accent-foreground: 210 40% 96%;
-  --destructive: 0 63% 38%;
-  --destructive-foreground: 210 40% 96%;
-  --ring: 262 83% 58%;
+  --accent-foreground: var(--text);
+  --destructive: var(--error);
+  --destructive-foreground: #f8fafc;
+  --ring: var(--accent);
+  --chart-1: #7c3aed;
+  --chart-2: #22d3ee;
+  --chart-3: #22c55e;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+  --sidebar: var(--panel);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--text);
+  --sidebar-accent: var(--panel-alt);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent);
 }
 
 body {
@@ -479,7 +496,6 @@ kbd {
   color: var(--text);
 }
 
-
 /* Monaco inline diagnostics pill badges */
 .monaco-pill { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: var(--size-small); line-height: 1.2; margin-left: 8px; }
 .monaco-pill.error { background: rgba(239,68,68,0.20); border: 1px solid rgba(239,68,68,0.35); color: #f87171; }
@@ -818,3 +834,85 @@ kbd {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: rgba(148, 163, 184, 0.12);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+.dark {
+  --background: #050910;
+  --foreground: var(--text);
+  --card: var(--panel);
+  --card-foreground: var(--text);
+  --popover: var(--panel);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--text);
+  --secondary: var(--panel-alt);
+  --secondary-foreground: var(--text);
+  --muted: #94a3b8;
+  --muted-foreground: rgba(226, 232, 240, 0.86);
+  --accent: var(--accent-2);
+  --accent-foreground: #0f172a;
+  --destructive: var(--error);
+  --border: rgba(15, 23, 42, 0.65);
+  --input: rgba(17, 24, 39, 0.65);
+  --ring: var(--accent);
+  --chart-1: #7c3aed;
+  --chart-2: #22d3ee;
+  --chart-3: #22c55e;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+  --sidebar: var(--panel);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--text);
+  --sidebar-accent: rgba(12, 19, 33, 0.9);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent);
+  --color-muted: rgba(148, 163, 184, 0.18);
+  --color-muted-foreground: rgba(226, 232, 240, 0.86);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

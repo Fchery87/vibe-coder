@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Command } from 'cmdk';
 import {
   FileText,
   Zap,
@@ -14,9 +13,19 @@ import {
   Search,
   FolderOpen,
   Terminal,
-  Code2
+  Code2,
 } from 'lucide-react';
 import type { Tab } from './TabBar';
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from '@/components/ui/command';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -27,7 +36,6 @@ interface CommandPaletteProps {
   onFileOpen?: (filePath: string) => void;
 }
 
-// Command categories
 const actionCommands = [
   { id: 'generate', label: 'Generate Code', shortcut: 'Ctrl+G', description: 'Generate code from prompt', icon: Zap },
   { id: 'checkpoint', label: 'Create Checkpoint', shortcut: 'Ctrl+S', description: 'Save current state', icon: Save },
@@ -39,7 +47,6 @@ const actionCommands = [
   { id: 'open-settings', label: 'Open Settings', shortcut: '', description: 'Configure Vibe Coder', icon: Settings },
 ];
 
-// Sample project files for demo (in real app, these would come from backend)
 const projectFiles = [
   { path: 'src/App.tsx', name: 'App.tsx', type: 'typescript' },
   { path: 'src/components/Button.tsx', name: 'Button.tsx', type: 'typescript' },
@@ -57,7 +64,7 @@ export default function CommandPalette({
   onCommand,
   openTabs = [],
   onTabSelect,
-  onFileOpen
+  onFileOpen,
 }: CommandPaletteProps) {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -71,157 +78,159 @@ export default function CommandPalette({
     return () => document.removeEventListener('keydown', down);
   }, [onClose]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center pt-20">
-      <Command className="glass-panel w-full max-w-2xl mx-4 rounded-xl shadow-2xl overflow-hidden border border-slate-700/50">
-        {/* Search Input */}
-        <div className="flex items-center gap-3 border-b border-slate-700/50 px-4 py-3">
-          <Search className="w-5 h-5 text-gray-400" />
-          <Command.Input
-            placeholder="Type a command, search files, or switch tabs..."
-            className="flex-1 bg-transparent border-0 outline-none text-white placeholder-gray-400 text-base"
-            autoFocus
-          />
-          <kbd className="text-xs text-gray-500 bg-slate-700/50 px-2 py-1 rounded font-mono">
-            ESC
-          </kbd>
-        </div>
+    <CommandDialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <CommandInput placeholder="Type a command, search files, or switch tabs..." />
+        <kbd className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">ESC</kbd>
+      </div>
 
-        <Command.List className="max-h-96 overflow-auto p-2">
-          <Command.Empty className="p-8 text-center text-gray-400">
-            <Search className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No results found</p>
-          </Command.Empty>
+      <CommandList className="px-2 py-2">
+        <CommandEmpty className="py-8">
+          <div className="flex flex-col items-center gap-3">
+            <Search className="h-12 w-12 opacity-30" />
+            <p className="text-sm text-muted-foreground">No results found</p>
+          </div>
+        </CommandEmpty>
 
-          {/* Open Tabs Section */}
-          {openTabs.length > 0 && (
-            <Command.Group heading="Open Tabs" className="px-2 py-2">
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-                <FolderOpen className="w-3 h-3" />
-                Open Tabs
-              </div>
+        {openTabs.length > 0 && (
+          <>
+            <CommandGroup
+              heading={
+                <span className="flex items-center gap-2">
+                  <FolderOpen className="h-3 w-3" />
+                  Open Tabs
+                </span>
+              }
+            >
               {openTabs.map((tab) => (
-                <Command.Item
+                <CommandItem
                   key={tab.id}
                   value={`tab-${tab.fileName}`}
                   onSelect={() => {
                     onTabSelect?.(tab.id);
                     onClose();
                   }}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors data-[selected=true]:bg-purple-500/20 hover:bg-slate-700/30 group"
+                  className="group gap-3 rounded-lg px-3 py-2.5"
                 >
-                  <Code2 className="w-4 h-4 text-blue-400" />
-                  <div className="flex-1 min-w-0">
+                  <Code2 className="h-4 w-4 text-blue-400" />
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-white font-medium truncate">{tab.fileName}</span>
-                      {tab.isDirty && (
-                        <span className="w-2 h-2 rounded-full bg-purple-400" title="Modified" />
-                      )}
+                      <span className="truncate text-sm font-medium text-foreground">{tab.fileName}</span>
+                      {tab.isDirty && <span className="h-2 w-2 rounded-full bg-purple-400" title="Modified" />}
                     </div>
-                    <p className="text-xs text-gray-400 truncate">{tab.filePath}</p>
+                    <p className="truncate text-xs text-muted-foreground">{tab.filePath ?? tab.id}</p>
                   </div>
-                  <kbd className="hidden group-data-[selected=true]:block text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded font-mono">
-                    ↵
-                  </kbd>
-                </Command.Item>
+                  <CommandShortcut className="hidden group-data-[selected=true]:inline-flex">Cmd+Enter</CommandShortcut>
+                </CommandItem>
               ))}
-            </Command.Group>
-          )}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
 
-          {/* Actions Section */}
-          <Command.Group heading="Actions" className="px-2 py-2">
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-              <Terminal className="w-3 h-3" />
+        <CommandGroup
+          heading={
+            <span className="flex items-center gap-2">
+              <Terminal className="h-3 w-3" />
               Actions
-            </div>
-            {actionCommands.map((command) => {
-              const Icon = command.icon;
-              return (
-                <Command.Item
-                  key={command.id}
-                  value={command.label}
-                  keywords={[command.description]}
-                  onSelect={() => {
-                    onCommand(command.id);
-                    onClose();
-                  }}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors data-[selected=true]:bg-purple-500/20 hover:bg-slate-700/30 group"
-                >
-                  <Icon className="w-4 h-4 text-purple-400" />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium">{command.label}</span>
-                      {command.shortcut && (
-                        <kbd className="text-xs text-gray-500 bg-slate-700/50 px-2 py-0.5 rounded font-mono">
-                          {command.shortcut}
-                        </kbd>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{command.description}</p>
-                  </div>
-                  <kbd className="hidden group-data-[selected=true]:block text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded font-mono">
-                    ↵
-                  </kbd>
-                </Command.Item>
-              );
-            })}
-          </Command.Group>
-
-          {/* Files Section */}
-          <Command.Group heading="Files" className="px-2 py-2">
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
-              <FileText className="w-3 h-3" />
-              Project Files
-            </div>
-            {projectFiles.map((file) => (
-              <Command.Item
-                key={file.path}
-                value={`file-${file.name} ${file.path}`}
+            </span>
+          }
+        >
+          {actionCommands.map((command) => {
+            const Icon = command.icon;
+            return (
+              <CommandItem
+                key={command.id}
+                value={command.label}
+                keywords={[command.description]}
                 onSelect={() => {
-                  onFileOpen?.(file.path);
+                  onCommand(command.id);
                   onClose();
                 }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors data-[selected=true]:bg-purple-500/20 hover:bg-slate-700/30 group"
+                className="group gap-3 rounded-lg px-3 py-2.5"
               >
-                <FileText className="w-4 h-4 text-green-400" />
-                <div className="flex-1 min-w-0">
-                  <span className="text-white font-medium truncate block">{file.name}</span>
-                  <p className="text-xs text-gray-400 truncate">{file.path}</p>
+                <Icon className="h-4 w-4 text-purple-400" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{command.label}</span>
+                    {command.shortcut && (
+                      <CommandShortcut className="hidden group-data-[selected=true]:inline-flex">
+                        {command.shortcut}
+                      </CommandShortcut>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{command.description}</p>
                 </div>
-                <kbd className="hidden group-data-[selected=true]:block text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded font-mono">
-                  ↵
-                </kbd>
-              </Command.Item>
-            ))}
-          </Command.Group>
-        </Command.List>
+                {!command.shortcut && (
+                  <CommandShortcut className="hidden group-data-[selected=true]:inline-flex">
+                    Enter
+                  </CommandShortcut>
+                )}
+              </CommandItem>
+            );
+          })}
+        </CommandGroup>
 
-        {/* Footer */}
-        <div className="border-t border-slate-700/50 bg-slate-800/50 px-4 py-2.5">
-          <div className="flex items-center justify-between text-xs text-gray-400">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1">
-                <kbd className="bg-slate-700/50 px-1.5 py-0.5 rounded font-mono">↑</kbd>
-                <kbd className="bg-slate-700/50 px-1.5 py-0.5 rounded font-mono">↓</kbd>
-                navigate
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="bg-slate-700/50 px-1.5 py-0.5 rounded font-mono">↵</kbd>
-                select
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="bg-slate-700/50 px-1.5 py-0.5 rounded font-mono">ESC</kbd>
-                close
-              </span>
-            </div>
-            <span>
-              {openTabs.length} tabs • {projectFiles.length} files • {actionCommands.length} actions
+        <CommandSeparator />
+
+        <CommandGroup
+          heading={
+            <span className="flex items-center gap-2">
+              <FileText className="h-3 w-3" />
+              Project Files
+            </span>
+          }
+        >
+          {projectFiles.map((file) => (
+            <CommandItem
+              key={file.path}
+              value={`file-${file.name} ${file.path}`}
+              onSelect={() => {
+                onFileOpen?.(file.path);
+                onClose();
+              }}
+              className="group gap-3 rounded-lg px-3 py-2.5"
+            >
+              <FileText className="h-4 w-4 text-green-400" />
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-foreground">{file.name}</span>
+                <p className="truncate text-xs text-muted-foreground">{file.path}</p>
+              </div>
+              <CommandShortcut className="hidden group-data-[selected=true]:inline-flex">Cmd+Enter</CommandShortcut>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+
+      <div className="border-t border-border bg-[var(--panel-alt)] px-4 py-2.5 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1">
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Up</kbd>
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Down</kbd>
+              navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
+              select
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">ESC</kbd>
+              close
             </span>
           </div>
+          <span>
+            {openTabs.length} tabs / {projectFiles.length} files / {actionCommands.length} actions
+          </span>
         </div>
-      </Command>
-    </div>
+      </div>
+    </CommandDialog>
   );
 }

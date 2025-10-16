@@ -118,7 +118,8 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
 
   useEffect(() => {
     const wf = selected ? workflows.find((w) => w.id === selected) : null;
-    if (!wf || !wf.path) {
+    const workflowPath = wf?.path;
+    if (!wf || !workflowPath) {
       setSchemaHint([]);
       return;
     }
@@ -127,7 +128,7 @@ export default function WorkflowsPanel({ owner, repo, installationId }: Props) {
         const res = await fetch(
           `/api/github/workflows/schema?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(
             repo
-          )}&installation_id=${installationId}&path=${encodeURIComponent(wf.path)}`
+          )}&installation_id=${installationId}&path=${encodeURIComponent(workflowPath)}`
         );
         const data = await res.json();
         if (!data.error) {

@@ -4,6 +4,7 @@ import { Sparkles, Brain, GitPullRequest, Save, Share2, Settings, Activity, Bell
 import GitHubConnect from "./GitHubConnect";
 import RepoPicker from "./RepoPicker";
 import { GitHubRepository } from "@/lib/github-types";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   streaming: boolean;
@@ -104,18 +105,18 @@ export default function HeaderBar({
             )}
           </>
         )}
-        <button className="btn" onClick={onSave} type="button">
+        <Button variant="secondary" size="sm" onClick={onSave} type="button" className="min-w-[68px]">
           <Save className="icon" />
           <span>Save</span>
-        </button>
-        <button className="btn" onClick={onPR} type="button">
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onPR} type="button">
           <GitPullRequest className="icon" />
           <span>PR</span>
-        </button>
-        <button className="btn" onClick={onShare} type="button">
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onShare} type="button">
           <Share2 className="icon" />
           <span>Share</span>
-        </button>
+        </Button>
         <div className="metrics">
           <span className="muted">chars</span>
           <strong>{metrics.chars ?? 0}</strong>
@@ -130,8 +131,10 @@ export default function HeaderBar({
             </>
           )}
         </div>
-        <button
-          className="btn relative"
+        <Button
+          variant="secondary"
+          size="sm"
+          className="relative"
           onClick={onNotificationsClick}
           type="button"
           title="Notifications"
@@ -142,10 +145,10 @@ export default function HeaderBar({
               {unreadNotifications > 99 ? '99+' : unreadNotifications}
             </span>
           )}
-        </button>
-        <button className="btn" onClick={onSettings} type="button">
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onSettings} type="button">
           <Settings className="icon" />
-        </button>
+        </Button>
       </div>
     </header>
   );

@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getInstallationClient } from "@/lib/github-client";
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 // POST /api/github/workflows/[id]/dispatch { owner, repo, ref, inputs?, installation_id }
-export async function POST(request: NextRequest, {
-  params,
-}: { params: { id: string } }) {
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const body = await request.json();
     const { owner, repo, ref, inputs, installation_id } = body || {};
-    const id = params.id;
+    const { id } = await context.params;
+    const workflowId = Number(id);
 
-    if (!owner || !repo || !ref || !installation_id || !id) {
+    if (!owner || !repo || !ref || !installation_id || Number.isNaN(workflowId)) {
       return NextResponse.json(
         { error: "owner, repo, ref, id, and installation_id are required" },
         { status: 400 }
@@ -22,7 +25,7 @@ export async function POST(request: NextRequest, {
     await octokit.rest.actions.createWorkflowDispatch({
       owner,
       repo,
-      workflow_id: id as any,
+      workflow_id: workflowId,
       ref,
       inputs,
     });
@@ -37,4 +40,3 @@ export async function POST(request: NextRequest, {
     return NextResponse.json({ error: true, message }, { status: 200 });
   }
 }
-

@@ -8,7 +8,6 @@ import PreviewPanel from "@/components/PreviewPanel";
 import CommandPalette from "@/components/CommandPalette";
 import AtlasCLI from "@/components/AtlasCLI";
 import StreamingEditor from "@/components/StreamingEditor";
-import { ToastContainer, useToast } from "@/components/Toast";
 import InlineDiff from "@/components/InlineDiff";
 import ModelFeedbackLoop from "@/components/ModelFeedbackLoop";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -42,6 +41,8 @@ import {
   Workflow,
   Settings as SettingsIcon,
 } from "lucide-react";
+import { Toaster } from "@/components/ui/sonner";
+import { toast as showToast } from "sonner";
 
 interface ProjectSnapshot {
   id: string;
@@ -85,7 +86,6 @@ interface AnswerStreamEventDetail {
 }
 
 export default function Home() {
-  const { toasts, addToast, removeToast } = useToast();
   const { tabs, activeTabId, activeTab: activeFileTab, openTab, closeTab, selectTab, updateTabContent } = useTabs();
   const {
     notifications,
@@ -232,6 +232,27 @@ export default function Home() {
     }
     return { enableNotifications: true, enableToasts: true };
   });
+
+  const addToast = useCallback(
+    (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+      const shouldShow = type === 'error' || uiPreferences.enableToasts;
+      if (!shouldShow) {
+        return;
+      }
+
+      const toastFn =
+        type === 'success'
+          ? showToast.success
+          : type === 'error'
+          ? showToast.error
+          : type === 'warning'
+          ? showToast.warning
+          : showToast.info;
+
+      toastFn(message);
+    },
+    [uiPreferences.enableToasts]
+  );
 
   const [cliModifiedFiles, setCliModifiedFiles] = useState<Set<string>>(new Set());
   const [cliActivity, setCliActivity] = useState<{
@@ -1896,7 +1917,7 @@ export default function Home() {
       />
 
       {/* Toast Notifications */}
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <Toaster position="top-right" richColors />
 
       {/* Notification Center */}
       <NotificationCenter

@@ -1,8 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Folder, ChevronDown, AlertCircle, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Folder, RefreshCw } from 'lucide-react';
 import { GitHubInstallation, GitHubRepository } from '@/lib/github-types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 interface RepoPickerProps {
   onRepoSelect: (repo: GitHubRepository, installationId: number) => void;
@@ -15,6 +23,7 @@ export default function RepoPicker({ onRepoSelect, isConnected }: RepoPickerProp
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRepoId, setSelectedRepoId] = useState<string>('');
 
   useEffect(() => {
     if (isConnected) {
@@ -59,7 +68,11 @@ export default function RepoPicker({ onRepoSelect, isConnected }: RepoPickerProp
         throw new Error(data.error);
       }
 
-      setRepositories(data.repositories || []);
+      const repos = data.repositories || [];
+      setRepositories(repos);
+      if (repos.length === 0) {
+        setSelectedRepoId('');
+      }
     } catch (err: any) {
       console.error('Failed to fetch repos:', err);
       setError(err.message);
@@ -71,14 +84,18 @@ export default function RepoPicker({ onRepoSelect, isConnected }: RepoPickerProp
   const handleInstallationChange = (installationId: number) => {
     setSelectedInstallation(installationId);
     setRepositories([]);
+    setSelectedRepoId('');
     fetchRepositories(installationId);
   };
 
-  const handleRepoSelect = (repo: GitHubRepository) => {
-    if (selectedInstallation) {
-      onRepoSelect(repo, selectedInstallation);
-    }
-  };
+  const repoOptions = useMemo(
+    () =>
+      repositories.map((repo) => ({
+        id: repo.id,
+        label: repo.name,
+      })),
+    [repositories],
+  );
 
   if (!isConnected) {
     return null;
@@ -98,9 +115,9 @@ export default function RepoPicker({ onRepoSelect, isConnected }: RepoPickerProp
       <div className="flex items-center gap-2 text-red-400 text-sm">
         <AlertCircle className="w-4 h-4" />
         <span>{error}</span>
-        <button onClick={fetchInstallations} className="text-blue-400 hover:underline">
+        <Button variant="link" size="sm" className="h-auto px-0 text-blue-400" onClick={fetchInstallations}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -125,46 +142,50 @@ export default function RepoPicker({ onRepoSelect, isConnected }: RepoPickerProp
     <div className="flex items-center gap-3">
       {/* Installation Selector */}
       {installations.length > 1 && (
-        <div className="relative">
-          <select
-            value={selectedInstallation || ''}
-            onChange={(e) => handleInstallationChange(parseInt(e.target.value))}
-            className="px-3 py-2 bg-[var(--panel-alt)] border border-[var(--border)] rounded-[var(--radius)] text-sm text-[var(--text)] pr-8 appearance-none cursor-pointer"
-          >
-            <option value="">Select Installation</option>
+        <Select
+          value={selectedInstallation ? String(selectedInstallation) : undefined}
+          onValueChange={(value) => handleInstallationChange(parseInt(value, 10))}
+        >
+          <SelectTrigger className="min-w-[220px] border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+            <SelectValue placeholder="Select Installation" />
+          </SelectTrigger>
+          <SelectContent className="border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
             {installations.map((inst) => (
-              <option key={inst.id} value={inst.id}>
+              <SelectItem key={inst.id} value={String(inst.id)}>
                 {inst.account.login} ({inst.account.type})
-              </option>
+              </SelectItem>
             ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)] pointer-events-none" />
-        </div>
+          </SelectContent>
+        </Select>
       )}
 
       {/* Repository Selector */}
       {selectedInstallation && (
-        <div className="relative">
-          <select
-            onChange={(e) => {
-              const repo = repositories.find(r => r.id === parseInt(e.target.value));
-              if (repo) handleRepoSelect(repo);
-            }}
-            className="px-3 py-2 bg-[var(--panel-alt)] border border-[var(--border)] rounded-[var(--radius)] text-sm text-[var(--text)] pr-8 appearance-none cursor-pointer min-w-[200px]"
-            disabled={loading || repositories.length === 0}
-          >
-            <option value="">
-              {loading ? 'Loading repos...' : 'Select Repository'}
-            </option>
-            {repositories.map((repo) => (
-              <option key={repo.id} value={repo.id}>
-                <Folder className="inline w-3 h-3 mr-1" />
-                {repo.name}
-              </option>
+        <Select
+          value={selectedRepoId || undefined}
+          onValueChange={(value) => {
+            setSelectedRepoId(value);
+            const repo = repositories.find((r) => r.id === parseInt(value, 10));
+            if (repo && selectedInstallation) {
+              onRepoSelect(repo, selectedInstallation);
+            }
+          }}
+          disabled={loading || repositories.length === 0}
+        >
+          <SelectTrigger className="min-w-[220px] border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+            <SelectValue placeholder={loading ? 'Loading repositories...' : 'Select Repository'} />
+          </SelectTrigger>
+          <SelectContent className="border-[var(--border)] bg-[var(--panel)] text-[var(--text)]">
+            {repoOptions.map((repo) => (
+              <SelectItem key={repo.id} value={String(repo.id)}>
+                <span className="flex items-center gap-2">
+                  <Folder className="h-3 w-3 shrink-0" />
+                  {repo.label}
+                </span>
+              </SelectItem>
             ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)] pointer-events-none" />
-        </div>
+          </SelectContent>
+        </Select>
       )}
     </div>
   );

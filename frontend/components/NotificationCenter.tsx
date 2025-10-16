@@ -1,7 +1,28 @@
 'use client';
 
-import { X, Check, CheckCheck, Trash2, Bell, BellOff } from 'lucide-react';
+import {
+  Bell,
+  BellOff,
+  Check,
+  CheckCheck,
+  CheckCircle2,
+  Info,
+  MoreVertical,
+  Trash2,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 import type { Notification } from '@/hooks/useNotifications';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -12,6 +33,45 @@ interface NotificationCenterProps {
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
   onRemove: (id: string) => void;
+}
+
+const TYPE_CONFIG: Record<
+  Notification['type'],
+  { icon: React.ComponentType<{ className?: string }>; badgeClass: string; label: string }
+> = {
+  success: {
+    icon: CheckCircle2,
+    badgeClass: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30',
+    label: 'Success',
+  },
+  error: {
+    icon: TriangleAlert,
+    badgeClass: 'bg-red-500/15 text-red-200 border-red-500/30',
+    label: 'Error',
+  },
+  warning: {
+    icon: TriangleAlert,
+    badgeClass: 'bg-amber-500/15 text-amber-200 border-amber-500/30',
+    label: 'Warning',
+  },
+  info: {
+    icon: Info,
+    badgeClass: 'bg-sky-500/15 text-sky-200 border-sky-500/30',
+    label: 'Info',
+  },
+};
+
+function formatTime(date: Date) {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 }
 
 export default function NotificationCenter({
@@ -26,197 +86,160 @@ export default function NotificationCenter({
 }: NotificationCenterProps) {
   if (!isOpen) return null;
 
-  const getIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'success':
-        return '✅';
-      case 'error':
-        return '❌';
-      case 'warning':
-        return '⚠️';
-      case 'info':
-      default:
-        return 'ℹ️';
-    }
-  };
-
-  const getTypeColor = (type: Notification['type']) => {
-    switch (type) {
-      case 'success':
-        return 'border-green-400/30 bg-green-500/10';
-      case 'error':
-        return 'border-red-400/30 bg-red-500/10';
-      case 'warning':
-        return 'border-yellow-400/30 bg-yellow-500/10';
-      case 'info':
-      default:
-        return 'border-blue-400/30 bg-blue-500/10';
-    }
-  };
-
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-  };
-
   return (
     <>
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md glass-panel border-l border-[var(--border)] shadow-2xl z-50 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border)] flex-shrink-0">
+      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-border bg-[var(--panel)] shadow-2xl">
+        <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-purple-400" />
-            <h2 className="text-lg font-semibold text-white">Notifications</h2>
+            <Bell className="h-5 w-5 text-purple-400" />
+            <span className="text-base font-semibold text-foreground">Notifications</span>
             {unreadCount > 0 && (
-              <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              <Badge variant="secondary" className="bg-purple-600 text-xs text-white">
                 {unreadCount}
-              </span>
+              </Badge>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-slate-700/50 rounded transition-colors text-gray-400 hover:text-white"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+            <X className="h-4 w-4" />
+          </Button>
+        </header>
 
-        {/* Actions Bar */}
         {notifications.length > 0 && (
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-slate-800/30 flex-shrink-0">
+          <div className="flex items-center gap-2 border-b border-border bg-[var(--panel-alt)] px-5 py-3">
             {unreadCount > 0 && (
-              <button
-                onClick={onMarkAllAsRead}
-                className="flex items-center gap-1 px-3 py-1 text-xs rounded bg-purple-600 hover:bg-purple-700 text-white transition-colors"
-              >
-                <CheckCheck className="w-3 h-3" />
+              <Button variant="secondary" size="sm" onClick={onMarkAllAsRead} className="gap-1">
+                <CheckCheck className="h-3 w-3" />
                 Mark all read
-              </button>
+              </Button>
             )}
-            <button
-              onClick={onClearAll}
-              className="flex items-center gap-1 px-3 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-gray-200 transition-colors"
-            >
-              <Trash2 className="w-3 h-3" />
+            <Button variant="ghost" size="sm" onClick={onClearAll} className="gap-1">
+              <Trash2 className="h-3 w-3" />
               Clear all
-            </button>
+            </Button>
           </div>
         )}
 
-        {/* Notifications List */}
-        <div className="flex-1 overflow-auto">
+        <ScrollArea className="flex-1">
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-              <BellOff className="w-16 h-16 text-gray-600 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-400 mb-2">
-                No notifications
-              </h3>
-              <p className="text-sm text-gray-500">
-                You're all caught up! Notifications will appear here.
-              </p>
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+              <BellOff className="h-16 w-16 text-muted-foreground" />
+              <div>
+                <p className="text-base font-semibold text-foreground">No notifications</p>
+                <p className="text-sm text-muted-foreground">
+                  You're all caught up. Notifications will appear here.
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="divide-y divide-[var(--border)]">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 hover:bg-slate-800/30 transition-colors ${
-                    !notification.read ? 'bg-purple-500/5' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Icon */}
-                    <span className="text-lg flex-shrink-0">
-                      {getIcon(notification.type)}
-                    </span>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className={`text-sm ${notification.read ? 'text-gray-300' : 'text-white font-medium'}`}>
-                          {notification.message}
-                        </p>
-                        {!notification.read && (
-                          <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0 mt-1" />
+            <div className="divide-y divide-border">
+              {notifications.map((notification) => {
+                const { icon: Icon, badgeClass, label } = TYPE_CONFIG[notification.type];
+                return (
+                  <div
+                    key={notification.id}
+                    className={cn(
+                      'px-5 py-4 transition-colors',
+                      !notification.read && 'bg-purple-500/5'
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={cn(
+                          'flex h-9 w-9 items-center justify-center rounded-full border',
+                          badgeClass
                         )}
-                      </div>
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
 
-                      <p className="text-xs text-gray-500 mb-2">
-                        {formatTime(notification.timestamp)}
-                      </p>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className={badgeClass}>
+                                {label}
+                              </Badge>
+                              {!notification.read && (
+                                <span className="h-2 w-2 rounded-full bg-purple-500" />
+                              )}
+                            </div>
+                            <p
+                              className={cn(
+                                'truncate text-sm',
+                                notification.read ? 'text-muted-foreground' : 'text-foreground font-medium'
+                              )}
+                            >
+                              {notification.message}
+                            </p>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-muted-foreground" aria-label="Notification actions">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" sideOffset={4} className="w-40">
+                              {!notification.read && (
+                                <DropdownMenuItem
+                                  onSelect={(event) => {
+                                    event.preventDefault();
+                                    onMarkAsRead(notification.id);
+                                  }}
+                                  className="gap-2"
+                                >
+                                  <Check className="h-4 w-4" />
+                                  Mark as read
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  onRemove(notification.id);
+                                }}
+                                className="gap-2 text-red-300 focus:text-red-200"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Remove
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{formatTime(notification.timestamp)}</p>
 
-                      {/* Action buttons */}
-                      {notification.actions && notification.actions.length > 0 && (
-                        <div className="flex items-center gap-2 mt-2">
-                          {notification.actions.map((action, index) => {
-                            const buttonStyles = action.variant === 'primary'
-                              ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                              : action.variant === 'danger'
-                              ? 'bg-red-600 hover:bg-red-700 text-white'
-                              : 'bg-slate-700 hover:bg-slate-600 text-gray-200';
-
-                            return (
-                              <button
+                        {notification.actions && notification.actions.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {notification.actions.map((action, index) => (
+                              <Button
                                 key={index}
+                                size="sm"
+                                variant={
+                                  action.variant === 'primary'
+                                    ? 'default'
+                                    : action.variant === 'danger'
+                                    ? 'destructive'
+                                    : 'secondary'
+                                }
                                 onClick={action.onClick}
-                                className={`px-2 py-1 text-xs rounded transition-colors ${buttonStyles}`}
                               >
                                 {action.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {!notification.read && (
-                        <button
-                          onClick={() => onMarkAsRead(notification.id)}
-                          className="p-1 hover:bg-slate-700/50 rounded transition-colors text-gray-400 hover:text-white"
-                          title="Mark as read"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => onRemove(notification.id)}
-                        className="p-1 hover:bg-slate-700/50 rounded transition-colors text-gray-400 hover:text-white"
-                        title="Remove"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
-        </div>
+        </ScrollArea>
 
-        {/* Footer */}
-        <div className="border-t border-[var(--border)] bg-slate-800/50 px-4 py-3 flex-shrink-0">
-          <p className="text-xs text-gray-400 text-center">
-            Showing last {Math.min(notifications.length, 50)} notifications
-          </p>
-        </div>
+        <footer className="border-t border-border px-5 py-3 text-center text-xs text-muted-foreground">
+          Showing last {Math.min(notifications.length, 50)} notifications
+        </footer>
       </div>
     </>
   );
