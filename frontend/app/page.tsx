@@ -11,6 +11,7 @@ import StreamingEditor from "@/components/StreamingEditor";
 import InlineDiff from "@/components/InlineDiff";
 import ModelFeedbackLoop from "@/components/ModelFeedbackLoop";
 import ThemeToggle from "@/components/ThemeToggle";
+import WorkspaceShell from "@/components/layout/WorkspaceShell";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import HeaderBar from "@/components/HeaderBar";
 import SettingsModal from "@/components/SettingsModal";
@@ -1573,10 +1574,8 @@ export default function Home() {
   }, [tabs, activeTabId, closeTab, selectTab]);
 
 
-  return (
-    <div className="min-h-screen bg-[var(--bg)] flex flex-col">
-      {/* Header Bar */}
-      <HeaderBar
+  const header = (
+    <HeaderBar
         streaming={isStreamingMode && isGenerating}
         thinking={false}
         streamingFileCount={streamingFileCount}
@@ -1603,199 +1602,172 @@ export default function Home() {
         unreadNotifications={unreadCount}
         onNotificationsClick={() => setIsNotificationCenterOpen(true)}
       />
+  );
 
-      <main className="flex flex-1 min-h-0 gap-[var(--gap-5)] px-4 pb-[var(--gap-5)]">
-        <ToolDrawer
-          tabs={drawerTabs}
-          defaultTab="explorer"
-          collapsed={isDrawerCollapsed}
-          onCollapsedChange={setIsDrawerCollapsed}
-        />
+  const drawer = (
+    <ToolDrawer
+      tabs={drawerTabs}
+      defaultTab="explorer"
+      collapsed={isDrawerCollapsed}
+      onCollapsedChange={setIsDrawerCollapsed}
+    />
+  );
 
-        {/* Main Content - Responsive Layout */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* Responsive Layout: Equal-width columns on large screens, stacked on smaller screens */}
-          <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 min-h-0 gap-0 xl:gap-0">
-            {/* Atlas CLI Column */}
-            <div className="flex flex-col min-h-0 xl:border-r border-[var(--border)]">
-              {/* CLI Header */}
-              <div className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
-                <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
-                  <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="hidden sm:inline">Atlas CLI</span>
-                  <span className="sm:hidden">CLI</span>
-                  <span className="text-xs text-green-400 bg-green-400/20 px-2 py-1 rounded-full">Genie Agent</span>
-                </h2>
-              </div>
+  const commandPalette = (
+    <CommandPalette
+      isOpen={isCommandPaletteOpen}
+      onClose={() => setIsCommandPaletteOpen(false)}
+      onCommand={handleCommand}
+      openTabs={tabs}
+      onTabSelect={selectTab}
+      onFileOpen={handleFileSelection}
+    />
+  );
 
-              {/* Generation Process - Show during generation */}
-              {isGenerating && (
-                <div className="px-3 md:px-4 py-2 bg-slate-900/50 backdrop-blur-xl border-b border-[var(--border)]">
-                  <ModelFeedbackLoop
-                    isActive={isGenerating}
-                    onComplete={() => {
-                      setIsGenerating(false);
-                    }}
-                  />
-                </div>
-              )}
+  const settingsModalContent = (
+    <SettingsModal
+      isOpen={isSettingsOpen}
+      onClose={() => setIsSettingsOpen(false)}
+      activeProvider={activeProvider}
+      selectedModel={selectedModel}
+      allowFailover={allowFailover}
+      githubEnabled={githubEnabled}
+      currentRepo={workspace ? `${workspace.owner}/${workspace.repo}` : null}
+      currentBranch={workspace?.branch ?? null}
+      webhooksConnected={webhooksConnected}
+      autoRefreshInterval={autoRefreshInterval}
+      serviceConnections={serviceConnections}
+      uiPreferences={uiPreferences}
+      onProviderChange={(provider) => {
+        setActiveProvider(provider);
+        localStorage.setItem('activeProvider', provider);
+      }}
+      onModelChange={(model) => {
+        setSelectedModel(model);
+        localStorage.setItem('selectedModel', model);
+      }}
+      onFailoverChange={setAllowFailover}
+      onGitHubEnabledChange={handleGitHubEnabledChange}
+      onAutoRefreshIntervalChange={setAutoRefreshInterval}
+      onServiceConnectionsChange={setServiceConnections}
+      onUIPreferencesChange={setUIPreferences}
+    />
+  );
 
-              {/* Atlas CLI Interface */}
-              <div className="flex-1 min-h-0">
-                <AtlasCLI
-                  onCommand={(command, opts) =>
-                    handleChatSubmit(command, { ...opts, source: opts?.source ?? 'cli' })
-                  }
-                  isGenerating={isGenerating}
-                  generatedCode={generatedCode}
-                  executionResult={executionResult}
-                  sandboxLogs={sandboxLogs}
-                  onFileModified={handleCliFileModified}
-                  onCliActivity={handleCliActivity}
-                  githubEnabled={githubEnabled}
-                  activeMode={chatMode}
-                  onModeChange={handleModeChange}
-                  askEnabled={enableAskMode}
-                />
-              </div>
-            </div>
+  const notificationsContent = (
+    <NotificationCenter
+      isOpen={isNotificationCenterOpen}
+      onClose={() => setIsNotificationCenterOpen(false)}
+      notifications={notifications}
+      unreadCount={unreadCount}
+      onMarkAsRead={markAsRead}
+      onMarkAllAsRead={markAllAsRead}
+      onClearAll={clearAll}
+      onRemove={removeNotification}
+    />
+  );
 
-            {/* Editor/Sandbox Column */}
-            <div className="flex flex-col min-h-0 xl:border-l border-[var(--border)]">
-              {/* Hidden StreamingEditor to keep functions exposed globally - positioned absolutely so it doesn't affect layout */}
-              <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
-                <StreamingEditor
-                  onStreamingComplete={handleStreamingComplete}
-                  onStreamingError={handleStreamingError}
-                  onFileModified={handleCliFileModified}
-                  onExitStreaming={() => setIsStreamingMode(false)}
-                />
-              </div>
+  const floatingAction = (
+    <div className="fixed bottom-4 right-4 z-40">
+      <ThemeToggle />
+    </div>
+  );
 
-              <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'editor' | 'sandbox')} className="flex-1 flex flex-col min-h-0">
-                {/* Header with Tabs */}
-                <div className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
-                  <TabsList className="grid w-full grid-cols-2 mb-2">
-                    <TabsTrigger value="editor">Editor</TabsTrigger>
-                    <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
-                  </TabsList>
-
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
-                      {activeView === 'editor' ? (
-                        <>
-                          <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <span className="hidden sm:inline">Code Editor</span>
-                          <span className="sm:hidden">Editor</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          <span className="hidden sm:inline">Preview Panel</span>
-                          <span className="sm:hidden">Preview</span>
-                        </>
-                      )}
-                    </h2>
-
-                    {/* Run Metadata Display - Desktop only */}
-                    {runMetadata && activeView === 'sandbox' && (
-                      <div className="hidden lg:flex items-center gap-2 text-xs">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[var(--muted)]">Tokens:</span>
-                          <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[var(--muted)]">Cost:</span>
-                          <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[var(--muted)]">Time:</span>
-                          <span className="text-blue-400 font-mono">{runMetadata.duration.toFixed(1)}s</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Editor Tab Content */}
-                <TabsContent value="editor" className="flex-1 min-h-0 m-0 flex flex-col">
-                  {isStreamingMode ? (
-                    <StreamingEditor
-                      onStreamingComplete={handleStreamingComplete}
-                      onStreamingError={handleStreamingError}
-                      onFileModified={handleCliFileModified}
-                      onExitStreaming={() => setIsStreamingMode(false)}
-                    />
-                  ) : (
-                    <>
-                      {/* Tab Bar for open files */}
-                      <TabBar
-                        tabs={tabs}
-                        activeTabId={activeTabId}
-                        onTabSelect={selectTab}
-                        onTabClose={closeTab}
-                      />
-
-                      {/* Code Editor */}
-                      <div className="flex-1 min-h-0">
-                        <CodeEditor
-                          value={
-                            activeFileTab?.content ||
-                            (isGenerating && !generatedCode
-                              ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!"
-                              : generatedCode || "// No file open. Select a file from the tree or generate code.")
-                          }
-                          onChange={(val) => {
-                            if (val !== undefined) {
-                              if (activeTabId) {
-                                updateTabContent(activeTabId, val);
-                              } else {
-                                setGeneratedCode(val);
-                              }
-                            }
-                          }}
-                          originalValue={activeFileTab?.content || originalGeneratedCode}
-                        />
-                      </div>
-                    </>
-                  )}
-                </TabsContent>
-
-                {/* Sandbox Tab Content */}
-                <TabsContent value="sandbox" className="flex-1 min-h-0 m-0">
-                  <PreviewPanel
-                    generatedCode={generatedCode}
-                    sandboxLogs={sandboxLogs}
-                    executionResult={executionResult}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
+  const workspaceContent = (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Responsive Layout: Equal-width columns on large screens, stacked on smaller screens */}
+      <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 min-h-0 gap-0 xl:gap-0">
+        {/* Atlas CLI Column */}
+        <div className="flex flex-col min-h-0 xl:border-r border-[var(--border)]">
+          {/* CLI Header */}
+          <div className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
+            <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
+              <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="hidden sm:inline">Atlas CLI</span>
+              <span className="sm:hidden">CLI</span>
+              <span className="text-xs text-green-400 bg-green-400/20 px-2 py-1 rounded-full">Genie Agent</span>
+            </h2>
           </div>
 
+          {/* Generation Process - Show during generation */}
+          {isGenerating && (
+            <div className="px-3 md:px-4 py-2 bg-slate-900/50 backdrop-blur-xl border-b border-[var(--border)]">
+              <ModelFeedbackLoop
+                isActive={isGenerating}
+                onComplete={() => {
+                  setIsGenerating(false);
+                }}
+              />
+            </div>
+          )}
 
-          {/* Terminal/Console with Status Feedback */}
-          <div className="h-32 md:h-40 glass-panel border-t border-white/10 bg-slate-900 transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col">
-            <div className="p-2 md:p-3 border-b border-white/10 flex-shrink-0">
+          {/* Atlas CLI Interface */}
+          <div className="flex-1 min-h-0">
+            <AtlasCLI
+              onCommand={(command, opts) =>
+                handleChatSubmit(command, { ...opts, source: opts?.source ?? 'cli' })
+              }
+              isGenerating={isGenerating}
+              generatedCode={generatedCode}
+              executionResult={executionResult}
+              sandboxLogs={sandboxLogs}
+              onFileModified={handleCliFileModified}
+              onCliActivity={handleCliActivity}
+              githubEnabled={githubEnabled}
+              activeMode={chatMode}
+              onModeChange={handleModeChange}
+              askEnabled={enableAskMode}
+            />
+          </div>
+        </div>
+
+        {/* Editor/Sandbox Column */}
+        <div className="flex flex-col min-h-0 xl:border-l border-[var(--border)]">
+          {/* Hidden StreamingEditor to keep functions exposed globally - positioned absolutely so it doesn't affect layout */}
+          <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+            <StreamingEditor
+              onStreamingComplete={handleStreamingComplete}
+              onStreamingError={handleStreamingError}
+              onFileModified={handleCliFileModified}
+              onExitStreaming={() => setIsStreamingMode(false)}
+            />
+          </div>
+
+          <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'editor' | 'sandbox')} className="flex-1 flex flex-col min-h-0">
+            {/* Header with Tabs */}
+            <div className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
+              <TabsList className="grid w-full grid-cols-2 mb-2">
+                <TabsTrigger value="editor">Editor</TabsTrigger>
+                <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
+              </TabsList>
+
               <div className="flex items-center justify-between">
-                <h3 className="text-xs md:text-sm font-semibold text-white flex items-center gap-2">
-                  <svg className="w-3 h-3 md:w-4 md:h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="hidden sm:inline">Terminal & Status</span>
-                  <span className="sm:hidden">Status</span>
-                </h3>
+                <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
+                  {activeView === 'editor' ? (
+                    <>
+                      <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="hidden sm:inline">Code Editor</span>
+                      <span className="sm:hidden">Editor</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      <span className="hidden sm:inline">Preview Panel</span>
+                      <span className="sm:hidden">Preview</span>
+                    </>
+                  )}
+                </h2>
 
-                {/* Run Metadata Display - Mobile */}
-                {runMetadata && (
-                  <div className="flex sm:hidden items-center gap-2 text-xs">
+                {/* Run Metadata Display - Desktop only */}
+                {runMetadata && activeView === 'sandbox' && (
+                  <div className="hidden lg:flex items-center gap-2 text-xs">
                     <div className="flex items-center gap-1">
                       <span className="text-[var(--muted)]">Tokens:</span>
                       <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
@@ -1804,101 +1776,142 @@ export default function Home() {
                       <span className="text-[var(--muted)]">Cost:</span>
                       <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
                     </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--muted)]">Time:</span>
+                      <span className="text-blue-400 font-mono">{runMetadata.duration.toFixed(1)}s</span>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="p-2 md:p-3 flex-1 overflow-auto min-h-0">
-              {sandboxLogs.length === 0 ? (
-                <div className="text-[var(--muted)] text-sm font-mono">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-green-400">$</span>
-                    <span className="text-[var(--text)]">Ready for sandbox execution...</span>
-                  </div>
-                </div>
+            {/* Editor Tab Content */}
+            <TabsContent value="editor" className="flex-1 min-h-0 m-0 flex flex-col">
+              {isStreamingMode ? (
+                <StreamingEditor
+                  onStreamingComplete={handleStreamingComplete}
+                  onStreamingError={handleStreamingError}
+                  onFileModified={handleCliFileModified}
+                  onExitStreaming={() => setIsStreamingMode(false)}
+                />
               ) : (
-                <div className="space-y-1">
-                  {sandboxLogs.slice(-6).map((log, index) => (
-                    <div key={index} className="text-xs font-mono flex items-start gap-2">
-                      <span className="flex-shrink-0">
-                        {log.type === 'error' ? '❌' :
-                         log.type === 'warn' ? '⚠️' :
-                         log.type === 'success' ? '✅' :
-                         log.type === 'info' ? 'ℹ️' :
-                         '📝'}
-                      </span>
-                      <span className="text-[var(--text)] flex-1">{log.message}</span>
-                      <span className="text-gray-500 text-xs flex-shrink-0">
-                        {log.timestamp.toLocaleTimeString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  {/* Tab Bar for open files */}
+                  <TabBar
+                    tabs={tabs}
+                    activeTabId={activeTabId}
+                    onTabSelect={selectTab}
+                    onTabClose={closeTab}
+                  />
+
+                  {/* Code Editor */}
+                  <div className="flex-1 min-h-0">
+                    <CodeEditor
+                      value={
+                        activeFileTab?.content ||
+                        (isGenerating && !generatedCode
+                          ? "// 🤖 AI is generating your code...\n// Please wait while we craft the perfect solution for you!"
+                          : generatedCode || "// No file open. Select a file from the tree or generate code.")
+                      }
+                      onChange={(val) => {
+                        if (val !== undefined) {
+                          if (activeTabId) {
+                            updateTabContent(activeTabId, val);
+                          } else {
+                            setGeneratedCode(val);
+                          }
+                        }
+                      }}
+                      originalValue={activeFileTab?.content || originalGeneratedCode}
+                    />
+                  </div>
+                </>
               )}
-            </div>
+            </TabsContent>
+
+            {/* Sandbox Tab Content */}
+            <TabsContent value="sandbox" className="flex-1 min-h-0 m-0">
+              <PreviewPanel
+                generatedCode={generatedCode}
+                sandboxLogs={sandboxLogs}
+                executionResult={executionResult}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Terminal/Console with Status Feedback */}
+      <div className="h-32 md:h-40 glass-panel border-t border-white/10 bg-slate-900 transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col">
+        <div className="p-2 md:p-3 border-b border-white/10 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs md:text-sm font-semibold text-white flex items-center gap-2">
+              <svg className="w-3 h-3 md:w-4 md:h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="hidden sm:inline">Terminal & Status</span>
+              <span className="sm:hidden">Status</span>
+            </h3>
+
+            {/* Run Metadata Display - Mobile */}
+            {runMetadata && (
+              <div className="flex sm:hidden items-center gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="text-[var(--muted)]">Tokens:</span>
+                  <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[var(--muted)]">Cost:</span>
+                  <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </main>
 
-      {/* Command Palette */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onCommand={handleCommand}
-        openTabs={tabs}
-        onTabSelect={selectTab}
-        onFileOpen={handleFileSelection}
-      />
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        activeProvider={activeProvider}
-        selectedModel={selectedModel}
-        allowFailover={allowFailover}
-        githubEnabled={githubEnabled}
-        currentRepo={workspace ? `${workspace.owner}/${workspace.repo}` : null}
-        currentBranch={workspace?.branch ?? null}
-        webhooksConnected={webhooksConnected}
-        autoRefreshInterval={autoRefreshInterval}
-        serviceConnections={serviceConnections}
-        uiPreferences={uiPreferences}
-        onProviderChange={(provider) => {
-          setActiveProvider(provider);
-          localStorage.setItem('activeProvider', provider);
-        }}
-        onModelChange={(model) => {
-          setSelectedModel(model);
-          localStorage.setItem('selectedModel', model);
-        }}
-        onFailoverChange={setAllowFailover}
-        onGitHubEnabledChange={handleGitHubEnabledChange}
-        onAutoRefreshIntervalChange={setAutoRefreshInterval}
-        onServiceConnectionsChange={setServiceConnections}
-        onUIPreferencesChange={setUIPreferences}
-      />
-
-      {/* Toast Notifications */}
-      <Toaster position="top-right" richColors />
-
-      {/* Notification Center */}
-      <NotificationCenter
-        isOpen={isNotificationCenterOpen}
-        onClose={() => setIsNotificationCenterOpen(false)}
-        notifications={notifications}
-        unreadCount={unreadCount}
-        onMarkAsRead={markAsRead}
-        onMarkAllAsRead={markAllAsRead}
-        onClearAll={clearAll}
-        onRemove={removeNotification}
-      />
-
-      {/* Theme Toggle - Floating */}
-      <div className="fixed bottom-4 right-4 z-40">
-        <ThemeToggle />
+        <div className="p-2 md:p-3 flex-1 overflow-auto min-h-0">
+          {sandboxLogs.length === 0 ? (
+            <div className="text-[var(--muted)] text-sm font-mono">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-green-400">$</span>
+                <span className="text-[var(--text)]">Ready for sandbox execution...</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {sandboxLogs.slice(-6).map((log, index) => (
+                <div key={index} className="text-xs font-mono flex items-start gap-2">
+                  <span className="flex-shrink-0">
+                    {log.type === 'error' ? '❌' :
+                     log.type === 'warn' ? '⚠️' :
+                     log.type === 'success' ? '✅' :
+                     log.type === 'info' ? 'ℹ️' :
+                     '📝'}
+                  </span>
+                  <span className="text-[var(--text)] flex-1">{log.message}</span>
+                  <span className="text-gray-500 text-xs flex-shrink-0">
+                    {log.timestamp.toLocaleTimeString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
+  );
+
+  return (
+    <WorkspaceShell
+      header={header}
+      drawer={drawer}
+      commandPalette={commandPalette}
+      settingsModal={settingsModalContent}
+      toaster={<Toaster position="top-right" richColors />}
+      notifications={notificationsContent}
+      floatingAction={floatingAction}
+    >
+      {workspaceContent}
+    </WorkspaceShell>
   );
 }
