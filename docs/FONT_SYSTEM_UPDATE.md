@@ -72,7 +72,7 @@ h1, h2, h3 {
 }
 ```
 
-### 2. Atlas CLI Component (`frontend/app/components/AtlasCLI.tsx`)
+### 2. Atlas CLI Component (`frontend/components/AtlasCLI.tsx`)
 
 **Container**:
 ```tsx

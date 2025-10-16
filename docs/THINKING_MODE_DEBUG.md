@@ -162,11 +162,11 @@ data: {"type":"THINKING","kind":"researching",...}
    - Forwards THINKING events to client
    - Buffers code for file generation
 
-3. **Streaming Editor** (`frontend/app/components/StreamingEditor.tsx`):
+3. **Streaming Editor** (`frontend/components/StreamingEditor.tsx`):
    - Added THINKING event handler
    - Calls `window.handleThinkingEvent()` for each event
 
-4. **Atlas CLI** (`frontend/app/components/AtlasCLI.tsx`):
+4. **Atlas CLI** (`frontend/components/AtlasCLI.tsx`):
    - Moved `emitToCLI()` to component level
    - Registered global `window.handleThinkingEvent()`
    - Displays thinking events in CLI output

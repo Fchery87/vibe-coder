@@ -1,23 +1,26 @@
 # Frontend UI Modernization Roadmap
 
-## Phase 1 – Layout Foundations
-- Extract a `WorkspaceShell` layout from `frontend/app/page.tsx` to separate primary editor, assistant timeline, and utility rail.
-- Refactor `ToolDrawer` into a persistent vertical rail with icon-only default state, hover previews, and consistent badge visibility.
-- Centralize theme tokens (dark/light palettes, typography, spacing) in a shared provider so Monaco and global UI share gradients, depth, and shadows.
-- Adopt shadcn/ui primitives for shared affordances; begin migrating high-visibility actions (e.g., header buttons) to the new component set.
-- Convert modal, select, and toggle controls (workspace settings, repo picker) to shadcn/dialog, select, and switch primitives for consistent interaction patterns.
-- Migrate transient surfaces (toast system, file tree context menu, theme switcher) onto shadcn Sonner/context/dropdown primitives to standardize interactions.
-- Replace ToolDrawer rail interactions with shadcn toggle group + tooltips for consistent selection and hover previews.
-- Remove conditional rendering of the legacy `FileTree` once the `Explorer` flag is enabled; keep the legacy component behind a feature flag only.
+## Completed (Phase 1 Milestones)
+- Refactored the ToolDrawer into a shadcn-powered vertical rail with hover previews, toggle groups, and tooltips.
+- Centralized design tokens and migrated high-visibility primitives (settings, repo picker, buttons) to the shadcn component stack.
+- Replaced legacy toasts, context menus, and the command palette with Sonner/shadcn counterparts for consistent interaction patterns.
+- Updated Notification Center, FileTree, Theme toggle, and Command surfaces to share the new token bridge.
+- Consolidated duplicate component trees into `frontend/components` and removed the legacy `app/components` copies; backend/documentation paths now point to the shared library.
 
-## Phase 2 – Interaction Enhancements
-- Introduce a floating “command dock” prompt area with recent commands and templates, replacing the fixed header prompt block.
-- Modularize the assistant transcript into card-based stackable panels and allow repositioning/responsiveness across breakpoints.
-- Extract tool tab content from inline `useMemo` definitions to isolated components so state persists across tab switches.
-- Add split-view presets (code ⇄ preview ⇄ diff) with draggable pane resizing to improve multi-surface workflows.
+## Phase 1 - Layout Foundations
+- Extract a `WorkspaceShell` layout from `frontend/app/page.tsx` so the primary editor, assistant timeline, and utility rail are isolated modules.
+- Remove bespoke utility classes (e.g. `.btn`, panel gradients) now superseded by shadcn to reduce CSS surface area.
+- Eliminate the legacy `FileTree` gating once the `Explorer` flag is stable; keep the fallback behind an opt-in flag only.
+- Break the `Home` page into feature slices (header, timeline, workspace shell) so streaming logic and state management are easier to maintain.
 
-## Phase 3 – Intelligent Surfaces
-- Implement an activity timeline lane that logs agent runs, PR events, and checkpoints for replay/branching.
-- Create a task queue drawer inspired by Copilot Workspace Plans to stage and track multi-step agent workflows.
-- Enhance empty states with animated or illustrated onboarding moments and repo health gauges to differentiate the experience.
-- Make editor footer metrics context-aware (language, encoding, diff stats) and compress them into modern status pills.
+## Phase 2 - Interaction Enhancements
+- Introduce a floating command dock prompt with recent requests and templates, replacing the static header entry.
+- Modularize the assistant transcript into card-based surfaces that can be reordered or collapsed across breakpoints; move inline tab definitions into dedicated components.
+- Route command palette results through real data sources (tabs, repo tree) instead of static `projectFiles` mocks.
+- Add split-view presets (code | preview | diff) with draggable pane resizing to support multi-surface workflows.
+
+## Phase 3 - Intelligent Surfaces
+- Implement an activity timeline that captures agent runs, PR events, and checkpoints for replay/branching.
+- Create a task queue drawer (inspired by Copilot Workspace Plans) to stage and track multi-step agent workflows.
+- Enhance empty states with guided onboarding moments and repo health gauges to highlight product value.
+- Make editor footer metrics context-aware (language, encoding, diff stats) and present them as modern status pills.

@@ -13,9 +13,9 @@
 **Fix**: Removed all three duplicate event emitters. Backend now owns all THINKING events via streaming API.
 
 **Files Changed**:
-- `frontend/app/components/AtlasCLI.tsx:256-262` - Removed planning event when isGenerating
-- `frontend/app/components/AtlasCLI.tsx:344-346` - Removed planning event in executeCommand
-- `frontend/app/components/AtlasCLI.tsx:279-282` - Removed summary event after completion
+- `frontend/components/AtlasCLI.tsx:256-262` - Removed planning event when isGenerating
+- `frontend/components/AtlasCLI.tsx:344-346` - Removed planning event in executeCommand
+- `frontend/components/AtlasCLI.tsx:279-282` - Removed summary event after completion
 
 ---
 
@@ -39,8 +39,8 @@ Also, line 289-291 auto-disabled thinking mode 2 seconds after code generation c
 3. Now thinking mode stays ON/OFF based solely on user's toggle button
 
 **Files Changed**:
-- `frontend/app/components/AtlasCLI.tsx:387-392` - Keep thinking mode state, don't auto-disable
-- `frontend/app/components/AtlasCLI.tsx:277-282` - Removed auto-disable after generation
+- `frontend/components/AtlasCLI.tsx:387-392` - Keep thinking mode state, don't auto-disable
+- `frontend/components/AtlasCLI.tsx:277-282` - Removed auto-disable after generation
 
 ---
 
@@ -57,13 +57,13 @@ formattedOutput += `${color}[${kindLabel}]${reset} ${timestamp}\n`;
 **Fix**: Removed ANSI codes, using clean plain text formatting for browser display.
 
 **Files Changed**:
-- `frontend/app/components/AtlasCLI.tsx:131-150` - Removed ANSI codes, use plain text formatting
+- `frontend/components/AtlasCLI.tsx:131-150` - Removed ANSI codes, use plain text formatting
 
 ---
 
 ## Changes Summary
 
-### `frontend/app/components/AtlasCLI.tsx`
+### `frontend/components/AtlasCLI.tsx`
 
 #### Line 121-165: `emitToCLI` function
 **Before**:
@@ -211,8 +211,8 @@ Next: Review generated code in editor; run tests if applicable
 
 - `backend/src/routes/llm.ts` - Emits all THINKING events with repository-specific content
 - `frontend/app/api/generate/route.ts` - Forwards THINKING events from backend to client
-- `frontend/app/components/StreamingEditor.tsx` - Receives events and calls `window.handleThinkingEvent()`
-- `frontend/app/components/AtlasCLI.tsx` - Displays events (no longer creates duplicates)
+- `frontend/components/StreamingEditor.tsx` - Receives events and calls `window.handleThinkingEvent()`
+- `frontend/components/AtlasCLI.tsx` - Displays events (no longer creates duplicates)
 
 ---
 

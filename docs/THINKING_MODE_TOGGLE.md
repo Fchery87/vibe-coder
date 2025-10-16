@@ -149,7 +149,7 @@ const emitToCLI = ({ kind, ts, items, text, output }: ThinkEvent) => {
 
 ## Files Modified
 
-1. **`frontend/app/components/AtlasCLI.tsx`**:
+1. **`frontend/components/AtlasCLI.tsx`**:
    - Added `toggleThinkingMode()` function
    - Modified `isThinkMode` state to use localStorage
    - Updated `emitToCLI()` to check thinking mode before rendering

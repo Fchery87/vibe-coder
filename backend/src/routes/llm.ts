@@ -208,7 +208,7 @@ const buildCodeOnlyPrompt = (userPrompt: string, context: PromptContext): string
   const fileHints: string[] = [];
   if (context.isFrontend) {
     fileHints.push(`frontend/app/page.tsx should render ${context.featureLabel}.`);
-    fileHints.push(`frontend/app/components/${context.componentName}.tsx implements the UI surface.`);
+    fileHints.push(`frontend/components/${context.componentName}.tsx implements the UI surface.`);
   }
   if (context.isBackend) {
     fileHints.push(`backend/src/routes/${context.routeSlug}.ts exposes API handlers.`);
@@ -277,7 +277,7 @@ const buildPlanningSteps = (context: PromptContext): string[] => {
       : 'frontend/app/page.tsx';
 
   if (context.isFrontend) {
-    const componentPath = `frontend/app/components/${context.componentName}.tsx`;
+    const componentPath = `frontend/components/${context.componentName}.tsx`;
     const stylePath = safeExists('frontend/app/globals.css') ? 'frontend/app/globals.css' : 'frontend/styles/globals.css';
 
     steps.push(`${safeExists(frontendEntry) ? 'Update' : 'Create'} ${frontendEntry} - render ${context.featureLabel} surface.`);
@@ -296,7 +296,7 @@ const buildPlanningSteps = (context: PromptContext): string[] => {
 
   if (context.wantsTests) {
     const testPath = context.isFrontend
-      ? `frontend/app/components/__tests__/${context.componentName}.test.tsx`
+      ? `frontend/components/__tests__/${context.componentName}.test.tsx`
       : `backend/tests/${context.routeSlug}.spec.ts`;
     steps.push(`${safeExists(testPath) ? 'Update' : 'Create'} ${testPath} - cover happy path, validation, and edge cases.`);
   }
@@ -334,8 +334,8 @@ const collectResearchFindings = (
 
   if (context.isFrontend) {
     findings.push(analyzeExistingFile('frontend/app/page.tsx', context));
-    findings.push(analyzeExistingFile('frontend/app/components/AtlasCLI.tsx', context));
-    const plannedComponent = `frontend/app/components/${context.componentName}.tsx`;
+    findings.push(analyzeExistingFile('frontend/components/AtlasCLI.tsx', context));
+    const plannedComponent = `frontend/components/${context.componentName}.tsx`;
     findings.push(analyzeExistingFile(plannedComponent, context));
   }
 
@@ -377,10 +377,10 @@ const normalizeGeneratedPath = (rawPath: string, context: PromptContext, index: 
 
   if (context.isFrontend) {
     if (clean.endsWith('.css')) {
-      return `frontend/app/components/${context.routeSlug || 'generated'}-${index}.module.css`;
+      return `frontend/components/${context.routeSlug || 'generated'}-${index}.module.css`;
     }
     if (clean.endsWith('.tsx') || clean.endsWith('.jsx')) {
-      return `frontend/app/components/${context.componentName}${clean.endsWith('.jsx') ? '.jsx' : '.tsx'}`;
+      return `frontend/components/${context.componentName}${clean.endsWith('.jsx') ? '.jsx' : '.tsx'}`;
     }
     if (clean.endsWith('.ts')) {
       return `frontend/app/services/${context.routeSlug || 'service'}.ts`;

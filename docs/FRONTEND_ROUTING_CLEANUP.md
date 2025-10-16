@@ -120,7 +120,7 @@ message: `🚀 Starting code generation with ${activeProvider || 'orchestrated'}
 message: `🚀 Starting code generation with ${activeProvider || 'openai'} model...`
 ```
 
-### 2. **frontend/app/components/StreamingEditor.tsx**
+### 2. **frontend/components/StreamingEditor.tsx**
 ✅ Already hardcoded to `'single-model'` - no changes needed
 
 ### 3. **frontend/app/api/generate/route.ts**

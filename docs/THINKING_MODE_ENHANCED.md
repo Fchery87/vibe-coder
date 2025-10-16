@@ -143,5 +143,5 @@ data: {"type":"THINKING","kind":"summary","ts":"10:31","output":"✓ Code genera
 
 - `backend/src/routes/llm.ts` - Main reasoning stream logic
 - `frontend/app/api/generate/route.ts` - Forwards THINKING events to client
-- `frontend/app/components/AtlasCLI.tsx` - Displays reasoning in CLI (lines 120-175)
+- `frontend/components/AtlasCLI.tsx` - Displays reasoning in CLI (lines 120-175)
 - `THINKING_MODE_DEBUG.md` - Original debugging guide

@@ -51,8 +51,8 @@ grep "bg-background\|bg-card\|text-muted-foreground" *.css
 
 ### Files Modified
 - `frontend/app/globals.css` - Replaced undefined utilities
-- `frontend/app/components/Editor.tsx` - Fixed import conflict
-- `frontend/app/components/FileTree.tsx` - Simplified implementation
+- `frontend/components/Editor.tsx` - Fixed import conflict
+- `frontend/components/FileTree.tsx` - Simplified implementation
 
 ### Lesson Learned
 **CSS compilation failures = unstyled layouts.** Always check for Tailwind errors in console and verify all utilities are defined before assuming layout code is broken.
