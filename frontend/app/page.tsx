@@ -1682,42 +1682,6 @@ export default function Home() {
                     <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
                   </TabsList>
 
-                  {/* Mode Selection */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      {[
-                        { id: 'quick', label: 'Quick', hint: 'Fast code streaming', disabled: false },
-                        { id: 'think', label: 'Think', hint: 'Plan, research, stream', disabled: false },
-                        { id: 'ask', label: 'Ask', hint: 'Guidance streamed to CLI', disabled: !enableAskMode },
-                      ].map(({ id, label, hint, disabled }) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => {
-                            if (disabled || chatMode === (id as PromptMode)) return;
-                            handleModeChange(id as PromptMode);
-                          }}
-                          disabled={disabled}
-                          className={[
-                            'px-3 py-1 text-xs rounded-full border transition-colors',
-                            chatMode === (id as PromptMode)
-                              ? 'border-purple-400 bg-purple-500/20 text-purple-100'
-                              : 'border-slate-700 text-[var(--muted)] hover:border-purple-400 hover:text-white',
-                            disabled ? 'opacity-40 cursor-not-allowed' : '',
-                          ].filter(Boolean).join(' ')}
-                          title={disabled ? `${hint} (Enable Ask Mode in Settings)` : hint}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <span className="text-xs text-[var(--muted)]">
-                      {chatMode === 'ask'
-                        ? 'Answers stream into the CLI without touching files'
-                        : 'Quick and Think stream code updates into the workspace'}
-                    </span>
-                  </div>
-
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
                       {activeView === 'editor' ? (
@@ -1734,8 +1698,8 @@ export default function Home() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
-                          <span className="hidden sm:inline">Sandbox & Preview</span>
-                          <span className="sm:hidden">Sandbox</span>
+                          <span className="hidden sm:inline">Preview Panel</span>
+                          <span className="sm:hidden">Preview</span>
                         </>
                       )}
                     </h2>
