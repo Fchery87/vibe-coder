@@ -19,8 +19,24 @@ import {
   GitPullRequest,
   GitCommit,
   Folder,
-  ArrowUpCircle
+  ArrowUpCircle,
+  ArrowUpIcon,
+  PlusIcon
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
+import { Separator } from "@/components/ui/separator";
 
 type PromptMode = 'quick' | 'think' | 'ask';
 
@@ -128,7 +144,7 @@ Ready to build something amazing? Just describe it!`,
   const [isThinkMode, setIsThinkMode] = useState(activeMode === 'think');
   const isThinkModeRef = useRef(isThinkMode); // Track current thinking mode state
   const outputRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const shellExecutor = ShellExecutor.getInstance();
   const answerSessionsRef = useRef<Map<string, { responseId: string }>>(new Map());
 
@@ -1281,11 +1297,20 @@ Try: npm install, git status, ls, or any shell command`;
     }
   };
 
+  const handleSubmit = () => {
+    if (currentCommand.trim() && !isExecuting) {
+      executeCommand(currentCommand);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
       case 'Enter':
-        e.preventDefault();
-        executeCommand(currentCommand);
+        // Allow Shift+Enter for new line in textarea
+        if (!e.shiftKey) {
+          e.preventDefault();
+          executeCommand(currentCommand);
+        }
         break;
 
       case 'ArrowUp':
@@ -1517,31 +1542,69 @@ Try: npm install, git status, ls, or any shell command`;
         </div>
 
         <div className="border-t border-[rgba(148,163,184,0.12)] bg-[rgba(11,16,32,0.9)] px-4 py-3 shadow-[0_-6px_18px_rgba(8,12,24,0.45)]">
-          <div className="flex items-center gap-[var(--gap-2)] text-[var(--size-small)] text-[var(--muted)] mb-2">
-            <span>Up arrow: history</span>
-            <span>|</span>
-            <span>Tab: autocomplete</span>
-            <span>|</span>
-            <span>Enter: execute</span>
-          </div>
-          <div className="flex items-center gap-[var(--gap-3)]">
-            <span className="text-[var(--accent-2)] flex-shrink-0">{isExecuting ? '>' : '$'}</span>
-            <input
+          <InputGroup className="bg-[rgba(15,20,33,0.92)]">
+            <InputGroupTextarea
               ref={inputRef}
-              type="text"
               value={currentCommand}
               onChange={(e) => setCurrentCommand(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 border border-[rgba(148,163,184,0.16)] bg-[rgba(15,20,33,0.92)] rounded-[var(--radius)] px-3 py-2 text-[var(--text)] placeholder-[rgba(148,163,184,0.6)] focus:outline-none focus:ring-0 focus:border-[rgba(124,58,237,0.45)]"
-              placeholder={isExecuting ? "Executing command..." : "Just describe what you want to build..."}
+              placeholder={isExecuting ? "Executing command..." : "Ask, Search or Chat..."}
               disabled={isExecuting}
               spellCheck={false}
               autoComplete="off"
+              rows={1}
+              className="min-h-[40px] max-h-[200px] resize-none"
             />
-            <span className="text-[var(--muted)] text-[var(--size-small)] flex-shrink-0">
-              {currentCommand.length > 0 ? `${currentCommand.length} chars` : ''}
-            </span>
-          </div>
+            <InputGroupAddon align="block-end">
+              <InputGroupButton
+                className="rounded-full"
+                size="icon-xs"
+                variant="outline"
+                disabled={isExecuting}
+              >
+                <PlusIcon />
+              </InputGroupButton>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <InputGroupButton variant="ghost" disabled={isExecuting}>
+                    {activeMode === 'quick' ? 'Quick' : activeMode === 'think' ? 'Think' : 'Ask'}
+                  </InputGroupButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="[--radius:0.95rem]"
+                  side="top"
+                >
+                  <DropdownMenuItem onClick={() => onModeChange?.('quick')}>
+                    Quick
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onModeChange?.('think')}>
+                    Think
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onModeChange?.('ask')}
+                    disabled={!askEnabled}
+                  >
+                    Ask
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <InputGroupText className="ml-auto">
+                {currentCommand.length > 0 ? `${currentCommand.length} chars` : ''}
+              </InputGroupText>
+              <Separator className="!h-4" orientation="vertical" />
+              <InputGroupButton
+                className="rounded-full"
+                disabled={isExecuting || !currentCommand.trim()}
+                size="icon-xs"
+                variant="default"
+                onClick={handleSubmit}
+              >
+                <ArrowUpIcon />
+                <span className="sr-only">Send</span>
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
       </div>
 

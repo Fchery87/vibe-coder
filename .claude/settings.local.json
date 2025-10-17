@@ -5,7 +5,11 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(npm run build)",
-      "Bash(npm run dev)"
+      "Bash(npm run dev)",
+      "Bash(npx shadcn@latest add input-group)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(printf:*)",
+      "Bash(yes:*)"
     ],
     "deny": [],
     "ask": []
