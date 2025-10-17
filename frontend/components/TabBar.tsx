@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export interface Tab {
   id: string;
@@ -51,55 +52,58 @@ export default function TabBar({
   return (
     <div className="relative border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
       <div className="scroll-fade">
-        <div className="flex overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-          {visibleTabs.map(tab => (
-            <div
-              key={tab.id}
-              className={`tab-item group flex items-center gap-[var(--gap-2)] px-3 py-2 text-[var(--size-small)] cursor-pointer border-r border-[var(--border)] whitespace-nowrap flex-shrink-0 transition-colors ${
-                activeTabId === tab.id
-                  ? 'bg-[var(--bg)] text-white border-b-2 border-b-purple-500'
-                  : 'text-[var(--muted)] hover:text-white hover:bg-[rgba(148,163,184,0.05)]'
-              }`}
-              onClick={() => onTabSelect(tab.id)}
-              onMouseDown={(e) => handleMiddleClick(e, tab.id)}
-              title={`${tab.filePath}${tab.isDirty ? ' (modified)' : ''}`}
-            >
-              {/* File icon based on language */}
-              <span className="text-xs">
-                {getFileIcon(tab.language || getLanguageFromFileName(tab.fileName))}
-              </span>
-
-              {/* File name */}
-              <span className="truncate max-w-32 sm:max-w-40">
-                {tab.fileName}
-              </span>
-
-              {/* Dirty indicator (unsaved changes) */}
-              {tab.isDirty && (
-                <span className="w-2 h-2 rounded-full bg-purple-400" title="Unsaved changes"></span>
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={(e) => handleCloseClick(e, tab.id)}
-                className="opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded p-0.5 transition-opacity"
-                title="Close (middle-click also works)"
+        <ScrollArea className="w-full">
+          <div className="flex">
+            {visibleTabs.map(tab => (
+              <div
+                key={tab.id}
+                className={`tab-item group flex items-center gap-[var(--gap-2)] px-3 py-2 text-[var(--size-small)] cursor-pointer border-r border-[var(--border)] whitespace-nowrap flex-shrink-0 transition-colors ${
+                  activeTabId === tab.id
+                    ? 'bg-[var(--bg)] text-white border-b-2 border-b-purple-500'
+                    : 'text-[var(--muted)] hover:text-white hover:bg-[rgba(148,163,184,0.05)]'
+                }`}
+                onClick={() => onTabSelect(tab.id)}
+                onMouseDown={(e) => handleMiddleClick(e, tab.id)}
+                title={`${tab.filePath}${tab.isDirty ? ' (modified)' : ''}`}
               >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
+                {/* File icon based on language */}
+                <span className="text-xs">
+                  {getFileIcon(tab.language || getLanguageFromFileName(tab.fileName))}
+                </span>
 
-          {/* Overflow indicator */}
-          {showOverflow && (
-            <div
-              className="tab-item flex items-center gap-1 px-3 py-2 text-[var(--size-small)] border-r border-[var(--border)] bg-slate-800/50 text-[var(--muted)] cursor-default"
-              title={`${overflowCount} more tab${overflowCount > 1 ? 's' : ''}`}
-            >
-              <span className="text-xs">+{overflowCount}</span>
-            </div>
-          )}
-        </div>
+                {/* File name */}
+                <span className="truncate max-w-32 sm:max-w-40">
+                  {tab.fileName}
+                </span>
+
+                {/* Dirty indicator (unsaved changes) */}
+                {tab.isDirty && (
+                  <span className="w-2 h-2 rounded-full bg-purple-400" title="Unsaved changes"></span>
+                )}
+
+                {/* Close button */}
+                <button
+                  onClick={(e) => handleCloseClick(e, tab.id)}
+                  className="opacity-0 group-hover:opacity-100 hover:bg-red-500/20 rounded p-0.5 transition-opacity"
+                  title="Close (middle-click also works)"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+
+            {/* Overflow indicator */}
+            {showOverflow && (
+              <div
+                className="tab-item flex items-center gap-1 px-3 py-2 text-[var(--size-small)] border-r border-[var(--border)] bg-slate-800/50 text-[var(--muted)] cursor-default"
+                title={`${overflowCount} more tab${overflowCount > 1 ? 's' : ''}`}
+              >
+                <span className="text-xs">+{overflowCount}</span>
+              </div>
+            )}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
     </div>
   );

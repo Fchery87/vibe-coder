@@ -24,12 +24,6 @@ import {
   PlusIcon
 } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
@@ -37,6 +31,8 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
 
 type PromptMode = 'quick' | 'think' | 'ask';
 
@@ -1564,33 +1560,48 @@ Try: npm install, git status, ls, or any shell command`;
               >
                 <PlusIcon />
               </InputGroupButton>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <InputGroupButton variant="ghost" disabled={isExecuting}>
-                    {activeMode === 'quick' ? 'Quick' : activeMode === 'think' ? 'Think' : 'Ask'}
-                  </InputGroupButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="[--radius:0.95rem]"
-                  side="top"
+
+              {/* Segmented Control for Quick/Think */}
+              <ToggleGroup
+                type="single"
+                value={activeMode === 'ask' ? '' : activeMode}
+                onValueChange={(value) => {
+                  if (value && (value === 'quick' || value === 'think')) {
+                    onModeChange?.(value as PromptMode);
+                  }
+                }}
+                className="gap-0 border border-input rounded-md overflow-hidden h-6"
+                disabled={isExecuting}
+              >
+                <ToggleGroupItem
+                  value="quick"
+                  className="h-6 px-2 text-xs rounded-none border-r border-input data-[state=on]:bg-purple-600 data-[state=on]:text-white"
+                  disabled={isExecuting}
                 >
-                  <DropdownMenuItem onClick={() => onModeChange?.('quick')}>
-                    Quick
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onModeChange?.('think')}>
-                    Think
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onModeChange?.('ask')}
-                    disabled={!askEnabled}
-                  >
-                    Ask
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <InputGroupText className="ml-auto">
-                {currentCommand.length > 0 ? `${currentCommand.length} chars` : ''}
+                  Quick
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="think"
+                  className="h-6 px-2 text-xs rounded-none data-[state=on]:bg-purple-600 data-[state=on]:text-white"
+                  disabled={isExecuting}
+                >
+                  Think
+                </ToggleGroupItem>
+              </ToggleGroup>
+
+              {/* Separate Ask Button */}
+              <InputGroupButton
+                size="xs"
+                variant={activeMode === 'ask' ? 'default' : 'ghost'}
+                onClick={() => onModeChange?.('ask')}
+                disabled={!askEnabled || isExecuting}
+                className={`h-6 px-2 text-xs ${activeMode === 'ask' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
+              >
+                Ask
+              </InputGroupButton>
+
+              <InputGroupText className="ml-auto text-xs">
+                {currentCommand.length > 0 ? `${currentCommand.length}` : ''}
               </InputGroupText>
               <Separator className="!h-4" orientation="vertical" />
               <InputGroupButton

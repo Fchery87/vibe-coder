@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import CodeEditor from '@/components/Editor';
 import { Sparkles } from 'lucide-react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface StreamingFile {
   path: string;
@@ -419,37 +420,40 @@ export default function StreamingEditor({
       {files.length > 0 && (
         <div className="relative border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
           <div className="scroll-fade">
-            <div className="flex overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-              {files.map(file => (
-                <div
-                  key={file.path}
-                  className={`tab flex items-center gap-[var(--gap-2)] px-3 py-2 text-[var(--size-small)] cursor-pointer border-r border-[var(--border)] whitespace-nowrap flex-shrink-0 ${
-                    activeFile === file.path ? 'active' : ''
-                  }`}
-                  onClick={() => setActive(file.path)}
-                >
-                  <span className="truncate max-w-40">{file.path.split('/').pop()}</span>
-                  {file.status === 'writing' && (
-                    <span className="badge on flex items-center gap-1 px-2 py-0.5 text-xs">
-                      <span className="streaming-dots scale-75">
-                        <span></span>
-                        <span></span>
-                        <span></span>
+            <ScrollArea className="w-full">
+              <div className="flex">
+                {files.map(file => (
+                  <div
+                    key={file.path}
+                    className={`tab flex items-center gap-[var(--gap-2)] px-3 py-2 text-[var(--size-small)] cursor-pointer border-r border-[var(--border)] whitespace-nowrap flex-shrink-0 ${
+                      activeFile === file.path ? 'active' : ''
+                    }`}
+                    onClick={() => setActive(file.path)}
+                  >
+                    <span className="truncate max-w-40">{file.path.split('/').pop()}</span>
+                    {file.status === 'writing' && (
+                      <span className="badge on flex items-center gap-1 px-2 py-0.5 text-xs">
+                        <span className="streaming-dots scale-75">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </span>
+                        Writing
                       </span>
-                      Writing
-                    </span>
-                  )}
-                  {file.status === 'done' && (
-                    <span className="badge success flex items-center gap-1 px-2 py-0.5 text-xs">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Done
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
+                    )}
+                    {file.status === 'done' && (
+                      <span className="badge success flex items-center gap-1 px-2 py-0.5 text-xs">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Done
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </div>
         </div>
       )}
