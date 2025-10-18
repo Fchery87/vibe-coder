@@ -17,10 +17,10 @@ export function httpLogger(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
 
   // Capture the original end function
-  const originalEnd = res.end;
+  const originalEnd = res.end.bind(res);
 
   // Override res.end to capture when response is sent
-  res.end = function(...args: any[]) {
+  res.end = function(this: Response, chunk?: any, encoding?: any, cb?: any) {
     const duration = Date.now() - start;
     const statusCode = res.statusCode;
 
@@ -47,8 +47,8 @@ export function httpLogger(req: Request, res: Response, next: NextFunction) {
     );
 
     // Call original end function
-    return originalEnd.apply(res, args);
-  };
+    return originalEnd(chunk, encoding, cb);
+  } as any;
 
   next();
 }
@@ -105,8 +105,8 @@ export function slowRequestLogger(thresholdMs: number = 1000) {
   return (req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
 
-    const originalEnd = res.end;
-    res.end = function(...args: any[]) {
+    const originalEnd = res.end.bind(res);
+    res.end = function(this: Response, chunk?: any, encoding?: any, cb?: any) {
       const duration = Date.now() - start;
 
       if (duration > thresholdMs) {
@@ -119,8 +119,8 @@ export function slowRequestLogger(thresholdMs: number = 1000) {
         });
       }
 
-      return originalEnd.apply(res, args);
-    };
+      return originalEnd(chunk, encoding, cb);
+    } as any;
 
     next();
   };

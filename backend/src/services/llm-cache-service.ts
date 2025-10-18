@@ -87,6 +87,42 @@ export class LLMCacheService {
   }
 
   /**
+   * Determine optimal TTL based on prompt content
+   */
+  private getOptimalTTL(prompt: string): number {
+    const promptLower = prompt.toLowerCase();
+
+    // Very long cache for documentation/explanation queries (2 hours)
+    if (promptLower.includes('documentation') ||
+        promptLower.includes('explain') ||
+        promptLower.includes('what is') ||
+        promptLower.includes('how to') ||
+        promptLower.includes('tutorial')) {
+      return 7200; // 2 hours
+    }
+
+    // Short cache for user-specific or time-sensitive (15 minutes)
+    if (promptLower.includes('my ') ||
+        promptLower.includes('current') ||
+        promptLower.includes('latest') ||
+        promptLower.includes('today') ||
+        promptLower.includes('now')) {
+      return 900; // 15 minutes
+    }
+
+    // Medium cache for code generation (45 minutes)
+    if (promptLower.includes('generate') ||
+        promptLower.includes('create') ||
+        promptLower.includes('write') ||
+        promptLower.includes('build')) {
+      return 2700; // 45 minutes
+    }
+
+    // Default (1 hour)
+    return this.ttl;
+  }
+
+  /**
    * Set cache response
    */
   async set(
@@ -106,13 +142,26 @@ export class LLMCacheService {
 
     try {
       const key = this.generateKey(params);
-      const ttl = customTtl ?? this.ttl;
+
+      // Use smart TTL if not explicitly provided
+      const ttl = customTtl ?? this.getOptimalTTL(params.prompt);
 
       await redisClient.set(key, response, { ex: ttl });
-      console.log(`💾 LLM Response cached: ${key} (TTL: ${ttl}s)`);
+      console.log(`💾 LLM Response cached: ${key} (TTL: ${ttl}s, Type: ${this.getCacheType(params.prompt)})`);
     } catch (error: any) {
       console.error('LLM cache set error:', error.message);
     }
+  }
+
+  /**
+   * Get cache type for logging
+   */
+  private getCacheType(prompt: string): string {
+    const promptLower = prompt.toLowerCase();
+    if (promptLower.includes('documentation') || promptLower.includes('explain')) return 'docs';
+    if (promptLower.includes('my ') || promptLower.includes('current')) return 'user-specific';
+    if (promptLower.includes('generate') || promptLower.includes('create')) return 'code-gen';
+    return 'general';
   }
 
   /**
