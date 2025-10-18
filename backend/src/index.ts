@@ -8,6 +8,11 @@ import cors from 'cors';
 import llmRouter from './routes/llm';
 import previewRouter from './routes/preview';
 
+// Import background workers and database
+import { initializeWorkers } from './services/workers';
+import { shutdownQueues } from './services/queue-manager';
+import prisma from './services/database';
+
 // Check if this is a CLI invocation
 const args = process.argv.slice(2);
 const isCLI = args.length > 0 && !args.includes('--server');
@@ -48,9 +53,41 @@ if (isCLI) {
     res.send('Hello from the orchestrator backend!');
   });
 
-  app.listen(port, () => {
-    console.log(`Backend server listening at http://localhost:${port}`);
+  // Initialize background workers
+  console.log('\n🚀 Initializing background job workers...');
+  initializeWorkers();
+
+  const server = app.listen(port, () => {
+    console.log(`\n✅ Backend server listening at http://localhost:${port}`);
+    console.log('✅ Background workers initialized and ready');
+    console.log('\n📋 Available services:');
+    console.log('  - LLM API: http://localhost:3001/llm');
+    console.log('  - Preview: http://localhost:3001/preview');
+    console.log('  - Job Queue: Active and processing');
   });
+
+  // Graceful shutdown handlers
+  const shutdown = async (signal: string) => {
+    console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+    // Close HTTP server
+    server.close(() => {
+      console.log('✅ HTTP server closed');
+    });
+
+    // Shutdown background workers and queues
+    await shutdownQueues();
+
+    // Close database connection
+    await prisma.$disconnect();
+    console.log('✅ Database disconnected');
+
+    console.log('✅ Graceful shutdown complete');
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 // CLI Types and Functions

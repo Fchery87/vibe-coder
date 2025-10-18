@@ -1,12 +1,18 @@
 import { Job } from 'bullmq';
 import { CodeGenerationJob } from '../queue-manager';
 import prisma from '../database';
+import { ProviderManager } from '../provider-manager';
+import { ModelRegistryService } from '../model-registry';
 
 /**
  * Code Generation Worker
  *
- * Processes code generation tasks using LLM agents
+ * Processes code generation tasks using your existing LLM provider system
  */
+
+const providerManager = new ProviderManager();
+const modelRegistry = new ModelRegistryService();
+
 export async function codeGenerationWorker(
   job: Job<CodeGenerationJob>
 ): Promise<any> {
@@ -15,81 +21,76 @@ export async function codeGenerationWorker(
   console.log(`🤖 Generating code for task ${taskId}`);
 
   try {
-    // Step 1: Load task details
+    // Step 1: Load task details (if exists in database)
     await job.updateProgress(10);
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      include: {
-        project: true,
-        user: true,
-      },
-    });
+    let task, agent, project;
 
-    if (!task) {
-      throw new Error(`Task ${taskId} not found`);
-    }
-
-    // Step 2: Select or create agent
-    await job.updateProgress(20);
-    let agent;
-    if (agentId) {
-      agent = await prisma.agent.findUnique({ where: { id: agentId } });
-    } else {
-      // Use default general agent
-      agent = await prisma.agent.findFirst({
-        where: { type: 'GENERAL', isActive: true },
-      });
-    }
-
-    if (!agent) {
-      throw new Error('No suitable agent found');
-    }
-
-    // Step 3: Create execution record
-    await job.updateProgress(30);
-    const execution = await prisma.execution.create({
-      data: {
-        taskId,
-        agentId: agent.id,
-        userId,
-        status: 'RUNNING',
-        input: {
-          prompt,
-          projectId,
+    try {
+      task = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: {
+          project: true,
+          user: true,
         },
-      },
-    });
+      });
 
-    // Step 4: Generate code using LLM
+      if (task) {
+        project = task.project;
+
+        // Step 2: Select or create agent
+        await job.updateProgress(20);
+        if (agentId) {
+          agent = await prisma.agent.findUnique({ where: { id: agentId } });
+        } else {
+          // Use default general agent
+          agent = await prisma.agent.findFirst({
+            where: { type: 'GENERAL', isActive: true },
+          });
+        }
+
+        // Step 3: Create execution record
+        await job.updateProgress(30);
+        await prisma.execution.create({
+          data: {
+            taskId,
+            agentId: agent?.id || 'default-agent',
+            userId,
+            status: 'RUNNING',
+            input: {
+              prompt,
+              projectId,
+            },
+          },
+        });
+      }
+    } catch (dbError) {
+      // Task doesn't exist in database - continue with job anyway
+      console.log('Note: Task not in database, proceeding with code generation');
+    }
+
+    // Step 4: Generate code using your existing LLM services
     await job.updateProgress(40);
 
-    // TODO: Replace with actual LLM call
-    // This is a placeholder - integrate with your existing LLM services
-    const generatedCode = await generateCodeWithLLM(prompt, agent, task.project);
+    const generatedCode = await generateCodeWithProviderManager(
+      prompt,
+      agent?.model || 'claude-3-5-sonnet-20241022',
+      agent?.provider || 'anthropic'
+    );
 
     await job.updateProgress(70);
 
     // Step 5: Save results
     const result = {
       code: generatedCode,
-      files: [], // TODO: Parse generated files
+      model: agent?.model || 'claude-3-5-sonnet-20241022',
+      provider: agent?.provider || 'anthropic',
       metadata: {
-        agentId: agent.id,
-        executionId: execution.id,
+        agentId: agent?.id || 'default',
+        taskId,
       },
     };
 
-    // Step 6: Update execution status
     await job.updateProgress(90);
-    await prisma.execution.update({
-      where: { id: execution.id },
-      data: {
-        status: 'COMPLETED',
-        output: result,
-        completedAt: new Date(),
-      },
-    });
-
     console.log(`✅ Code generation completed for task ${taskId}`);
     return result;
   } catch (error: any) {
@@ -99,21 +100,28 @@ export async function codeGenerationWorker(
 }
 
 /**
- * Placeholder LLM function - replace with actual implementation
+ * Generate code using your existing ProviderManager
  */
-async function generateCodeWithLLM(
+async function generateCodeWithProviderManager(
   prompt: string,
-  agent: any,
-  project: any
+  model: string,
+  provider: string
 ): Promise<string> {
-  // TODO: Integrate with your existing LLM services
-  // Example:
-  // - Use Anthropic service (backend/src/services/anthropic.ts)
-  // - Use OpenAI service (backend/src/services/openai.ts)
-  // - Use routing service to select best model
+  try {
+    console.log(`Generating code with ${provider}/${model}`);
 
-  console.log(`Generating code with ${agent.model} for prompt: ${prompt}`);
+    // Use your existing provider manager to call the LLM
+    const response = await providerManager.generateCode({
+      prompt,
+      model,
+      provider,
+      maxTokens: 4096,
+      temperature: 0.7,
+    });
 
-  // Placeholder response
-  return `// Generated code for: ${prompt}\n// Project: ${project.name}\n\nconsole.log("Hello from generated code!");`;
+    return response.code || response.text || JSON.stringify(response);
+  } catch (error: any) {
+    console.error('LLM generation error:', error.message);
+    throw new Error(`Code generation failed: ${error.message}`);
+  }
 }
