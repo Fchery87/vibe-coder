@@ -35,7 +35,7 @@ if (isCLI) {
   console.log('[dotenv] SUPERNOVA_API_KEY length:', process.env.SUPERNOVA_API_KEY?.length || 0);
 
   const app = express();
-  const port = 3001;
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
 
   app.use(cors({
     origin: ['http://localhost:3000', 'https://vibe-coder.vercel.app']
@@ -54,15 +54,16 @@ if (isCLI) {
   });
 
   // Initialize background workers
-  console.log('\n🚀 Initializing background job workers...');
+  console.log('\n[workers] Initializing background job workers...');
   initializeWorkers();
 
   const server = app.listen(port, () => {
-    console.log(`\n✅ Backend server listening at http://localhost:${port}`);
-    console.log('✅ Background workers initialized and ready');
-    console.log('\n📋 Available services:');
-    console.log('  - LLM API: http://localhost:3001/llm');
-    console.log('  - Preview: http://localhost:3001/preview');
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
+    console.log(`\n[o] Backend server listening at ${baseUrl}`);
+    console.log('[o] Background workers initialized and ready');
+    console.log('\n[o] Available services:');
+    console.log(`  - LLM API: ${baseUrl}/llm`);
+    console.log(`  - Preview: ${baseUrl}/preview`);
     console.log('  - Job Queue: Active and processing');
   });
 

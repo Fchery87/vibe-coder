@@ -1,0 +1,38 @@
+version: 1
+
+services:
+  - type: web
+    name: vibe-coder-backend
+    env: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      - key: SUPERNOVA_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
