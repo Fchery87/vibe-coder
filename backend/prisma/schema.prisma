@@ -1,0 +1,323 @@
+// Prisma schema for Vibe Coder with Supabase
+// Phase 1: Foundation Infrastructure
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets = ["native", "debian-openssl-3.0.x", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ============================================
+// USERS & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  avatarUrl     String?   @map("avatar_url")
+  githubId      String?   @unique @map("github_id")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  projects      Project[]
+  tasks         Task[]
+  executions    Execution[]
+
+  @@map("users")
+}
+
+// ============================================
+// PROJECTS & REPOSITORIES
+// ============================================
+
+model Project {
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  repositoryUrl String?   @map("repository_url")
+
+  // GitHub metadata
+  githubRepoId  String?   @unique @map("github_repo_id")
+  defaultBranch String    @default("main") @map("default_branch")
+
+  // Ownership
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tasks         Task[]
+  commits       Commit[]
+  codeEmbeddings CodeEmbedding[]
+
+  @@index([userId])
+  @@map("projects")
+}
+
+// ============================================
+// TASKS & EXECUTION
+// ============================================
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("task_status")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@map("task_priority")
+}
+
+model Task {
+  id            String       @id @default(uuid())
+  title         String
+  description   String?
+  prompt        String       @db.Text
+
+  // Status and metadata
+  status        TaskStatus   @default(PENDING)
+  priority      TaskPriority @default(MEDIUM)
+
+  // Task decomposition (for multi-agent)
+  parentTaskId  String?      @map("parent_task_id")
+  parentTask    Task?        @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks      Task[]       @relation("TaskSubtasks")
+
+  // Results
+  result        Json?
+  errorMessage  String?      @map("error_message") @db.Text
+
+  // Ownership
+  projectId     String       @map("project_id")
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId        String       @map("user_id")
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  completedAt   DateTime?    @map("completed_at")
+
+  // Relations
+  executions    Execution[]
+  commits       Commit[]
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@index([parentTaskId])
+  @@map("tasks")
+}
+
+// ============================================
+// AGENTS & EXECUTION
+// ============================================
+
+enum AgentType {
+  PLANNER
+  DATABASE
+  BACKEND
+  FRONTEND
+  REVIEWER
+  GENERAL
+
+  @@map("agent_type")
+}
+
+model Agent {
+  id            String     @id @default(uuid())
+  name          String
+  type          AgentType
+  description   String?
+  capabilities  String[]   // Array of capability tags
+
+  // Configuration
+  model         String     // e.g., "claude-3-5-sonnet-20241022"
+  provider      String     // e.g., "anthropic", "openai"
+  systemPrompt  String     @map("system_prompt") @db.Text
+
+  isActive      Boolean    @default(true) @map("is_active")
+
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  executions    Execution[]
+
+  @@map("agents")
+}
+
+enum ExecutionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("execution_status")
+}
+
+model Execution {
+  id            String           @id @default(uuid())
+
+  // What was executed
+  taskId        String           @map("task_id")
+  task          Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  agentId       String           @map("agent_id")
+  agent         Agent            @relation(fields: [agentId], references: [id])
+
+  // Status and results
+  status        ExecutionStatus  @default(QUEUED)
+  input         Json?
+  output        Json?
+  errorMessage  String?          @map("error_message") @db.Text
+
+  // Metrics
+  tokensUsed    Int?             @map("tokens_used")
+  cost          Float?           // In USD
+  durationMs    Int?             @map("duration_ms")
+
+  // Ownership
+  userId        String           @map("user_id")
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  completedAt   DateTime?        @map("completed_at")
+
+  @@index([taskId])
+  @@index([agentId])
+  @@index([userId])
+  @@index([status])
+  @@map("executions")
+}
+
+// ============================================
+// GIT & VERSION CONTROL
+// ============================================
+
+model Commit {
+  id            String    @id @default(uuid())
+  sha           String    @unique
+  message       String    @db.Text
+  author        String
+  authorEmail   String    @map("author_email")
+
+  // Git metadata
+  branch        String?
+  filesChanged  Int?      @map("files_changed")
+  additions     Int?
+  deletions     Int?
+
+  // Relationships
+  projectId     String    @map("project_id")
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  taskId        String?   @map("task_id")
+  task          Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  reviews       Review[]
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([sha])
+  @@map("commits")
+}
+
+// ============================================
+// CODE REVIEW
+// ============================================
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+  COMMENTED
+
+  @@map("review_status")
+}
+
+model Review {
+  id            String       @id @default(uuid())
+
+  commitId      String       @map("commit_id")
+  commit        Commit       @relation(fields: [commitId], references: [id], onDelete: Cascade)
+
+  status        ReviewStatus @default(PENDING)
+  summary       String?      @db.Text
+
+  // Quality metrics
+  qualityScore  Float?       @map("quality_score")
+  securityScore Float?       @map("security_score")
+
+  // Issues found
+  issues        Json?        // Array of issues with severity, type, location
+  suggestions   Json?        // Array of improvement suggestions
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([commitId])
+  @@map("reviews")
+}
+
+// ============================================
+// SEMANTIC SEARCH (Phase 3)
+// ============================================
+// Uses pgvector extension for embeddings
+
+model CodeEmbedding {
+  id            String    @id @default(uuid())
+
+  // File information
+  filePath      String    @map("file_path")
+  chunkIndex    Int       @map("chunk_index")
+  content       String    @db.Text
+
+  // Embedding vector (OpenAI: 3072 dimensions, Cohere: 1024)
+  embedding     Unsupported("vector(3072)")?
+
+  // Metadata for filtering
+  language      String?   // e.g., "typescript", "python"
+  fileType      String?   @map("file_type") // e.g., "component", "service", "test"
+  metadata      Json?     // Additional custom metadata
+
+  // Versioning
+  commitSha     String?   @map("commit_sha")
+
+  // Ownership
+  projectId     String    @map("project_id")
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([filePath])
+  @@map("code_embeddings")
+}
