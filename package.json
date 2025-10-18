@@ -9,7 +9,10 @@
     "cli": "cd backend && npm run cli"
   },
   "devDependencies": {
-    "concurrently": "^7.6.0"
+    "concurrently": "^7.6.0",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   },
   "dependencies": {
     "typescript": "^5.9.3"

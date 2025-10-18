@@ -14,6 +14,8 @@ import { ExpoService, ExpoProjectConfig } from '../services/expo-service';
 import { FlutterService, FlutterProjectConfig } from '../services/flutter-service';
 import { CodeQualityService } from '../services/code-quality-service';
 import { DiffValidationService } from '../services/diff-validation-service';
+import { rateLimitLLM, rateLimit } from '../middleware/rate-limit';
+import { llmCacheService } from '../services/llm-cache-service';
 
 const router = Router();
 const modelRegistry = new ModelRegistryService();
@@ -500,7 +502,7 @@ const describeGeneratedChange = (file: ParsedFile, context: PromptContext): stri
 
 
 
-router.post('/generate', validateGenerateRequest, async (req: Request, res: Response) => {
+router.post('/generate', rateLimitLLM(), validateGenerateRequest, async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -643,35 +645,57 @@ router.post('/generate', validateGenerateRequest, async (req: Request, res: Resp
     let isMock = false;
     let errorMessage: string | undefined;
     let generatedFiles: ParsedFile[] = [];
+    let cachedResponse = false;
+
     try {
       console.log('[/llm/generate] calling providerManager.generateCode');
-
-      // Emit executing event
-      if (useStreaming) {
-        const apiEndpoint = getProviderAPIEndpoint(targetProvider);
-        const maxTokens = modelConfig?.maxTokens ?? getDefaultMaxTokens(targetModel);
-        const executingItems: string[] = [
-          `POST ${apiEndpoint} (${prompt.length} chars prompt payload)`,
-          `Headers: model=${targetModel}, max_tokens=${maxTokens}, temperature=0.7`,
-          'Streaming pipeline: frontend/app/api/generate/route.ts -> StreamingEditor.tsx (FILE_OPEN/APPEND events)'
-        ];
-        if (!providerStatus.available) {
-          executingItems.push('Provider unavailable - using mock response path in backend/src/routes/llm.ts');
-        }
-        emitThinkingEvent(res, {
-          kind: 'executing',
-          ts: formatTimestamp(),
-          items: executingItems
-        });
-      }
 
       const generationPrompt = `${buildCodeOnlyPrompt(prompt, promptContext)}
 
 <BEGIN SPEC>
 ${prompt}
 <END SPEC>`;
-      result = await providerManager.generateCode(targetProvider, targetModel, generationPrompt, modelConfig);
-      console.log('[/llm/generate] provider call succeeded');
+
+      // Check cache before making LLM call
+      const cacheParams = {
+        provider: targetProvider,
+        model: targetModel,
+        prompt: generationPrompt,
+        temperature: 0.7,
+        maxTokens: modelConfig?.maxTokens ?? getDefaultMaxTokens(targetModel)
+      };
+
+      const cachedResult = await llmCacheService.get(cacheParams);
+      if (cachedResult) {
+        result = cachedResult;
+        cachedResponse = true;
+        console.log('[/llm/generate] Cache HIT - returning cached response');
+      } else {
+        // Emit executing event
+        if (useStreaming) {
+          const apiEndpoint = getProviderAPIEndpoint(targetProvider);
+          const maxTokens = modelConfig?.maxTokens ?? getDefaultMaxTokens(targetModel);
+          const executingItems: string[] = [
+            `POST ${apiEndpoint} (${prompt.length} chars prompt payload)`,
+            `Headers: model=${targetModel}, max_tokens=${maxTokens}, temperature=0.7`,
+            'Streaming pipeline: frontend/app/api/generate/route.ts -> StreamingEditor.tsx (FILE_OPEN/APPEND events)'
+          ];
+          if (!providerStatus.available) {
+            executingItems.push('Provider unavailable - using mock response path in backend/src/routes/llm.ts');
+          }
+          emitThinkingEvent(res, {
+            kind: 'executing',
+            ts: formatTimestamp(),
+            items: executingItems
+          });
+        }
+
+        result = await providerManager.generateCode(targetProvider, targetModel, generationPrompt, modelConfig);
+        console.log('[/llm/generate] provider call succeeded');
+
+        // Cache the successful response (1 hour TTL)
+        await llmCacheService.set(cacheParams, result, 3600);
+      }
 
       // Emit drafting event
       if (useStreaming) {
@@ -825,6 +849,7 @@ console.log("Hello from AI-generated code!");`;
         estimatedCost,
         routingMode: routingMode || 'manual',
         mock: isMock,
+        cached: cachedResponse,
         error: isMock ? errorMessage : undefined
       },
       budget: {
@@ -876,6 +901,16 @@ router.get('/models', async (req: Request, res: Response) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get model information' });
+  }
+});
+
+// Cache statistics endpoint
+router.get('/cache/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = await llmCacheService.getStats();
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get cache statistics' });
   }
 });
 
@@ -984,7 +1019,7 @@ router.put('/optimization/config', async (req: Request, res: Response) => {
 });
 
 // Endpoint to execute prompt graph workflow
-router.post('/execute-workflow', async (req: Request, res: Response) => {
+router.post('/execute-workflow', rateLimitLLM(), async (req: Request, res: Response) => {
   try {
     const { prompt, language, framework, complexity, requirements, constraints } = req.body;
 
@@ -1755,7 +1790,7 @@ router.post('/validation/diff', async (req: Request, res: Response) => {
 });
 
 // Full workflow with prompt graph executor and diff validation
-router.post('/workflow/generate', async (req: Request, res: Response) => {
+router.post('/workflow/generate', rateLimitLLM(), async (req: Request, res: Response) => {
   const { prompt, language, framework, complexity, requirements, constraints } = req.body;
 
   try {
