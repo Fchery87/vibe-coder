@@ -1541,7 +1541,7 @@ Try: npm install, git status, ls, or any shell command`;
           className="border-t border-[var(--cli-input-border)] bg-[var(--cli-input-shell-bg)] px-4 py-3"
           style={{ boxShadow: 'var(--cli-input-shadow)' }}
         >
-          <InputGroup className="bg-[var(--cli-input-bg)] border border-[var(--cli-input-border)] rounded-lg">
+          <InputGroup className="!bg-[var(--cli-input-bg)] border border-[var(--cli-input-border)] rounded-lg">
             <InputGroupTextarea
               ref={inputRef}
               value={currentCommand}
@@ -1552,7 +1552,7 @@ Try: npm install, git status, ls, or any shell command`;
               spellCheck={false}
               autoComplete="off"
               rows={1}
-              className="min-h-[40px] max-h-[200px] resize-none bg-transparent text-[var(--foreground)] placeholder:text-[var(--muted)]"
+              className="min-h-[40px] max-h-[200px] resize-none bg-[var(--cli-input-bg)] text-[var(--foreground)] placeholder:text-[var(--muted)]"
             />
             <InputGroupAddon align="block-end">
               <InputGroupButton

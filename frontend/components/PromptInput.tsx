@@ -101,7 +101,7 @@ Examples:
 • Create a real-time chat application with WebSocket
 
 💡 Tip: Use @filename to target specific files (e.g., 'Refactor @App.js')"
-          className="w-full min-h-[120px] p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder-[var(--muted)] resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm"
+          className="w-full min-h-[120px] p-4 bg-[var(--cli-input-bg)] border border-[var(--cli-input-border)] rounded-xl text-[var(--foreground)] placeholder-[var(--muted)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent shadow-sm"
           disabled={isSubmitting}
         />
       </div>
@@ -115,7 +115,7 @@ Examples:
               key={index}
               onClick={() => setPrompt(suggestion)}
               disabled={isSubmitting}
-              className="px-3 py-2 text-xs bg-[var(--panel-muted-bg)] hover:bg-[var(--tab-hover-bg)] border border-[var(--border)] rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+              className="px-3 py-2 text-xs bg-[var(--panel-muted-bg)] hover:bg-[var(--tab-hover-bg)] border border-[var(--border)] rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {suggestion}
             </button>
