@@ -97,7 +97,7 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
       case 'info':
         return 'border-[rgba(34,211,238,0.3)] bg-[rgba(34,211,238,0.08)]';
       default:
-        return 'border-[rgba(148,163,184,0.16)] bg-[rgba(11,16,32,0.65)]';
+        return 'preview-log-surface';
     }
   };
 
@@ -241,9 +241,9 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
 
   return (
     <div className="panel flex flex-col h-full overflow-hidden">
-      <header className="flex items-center justify-between gap-[var(--gap-4)] border-b border-[rgba(148,163,184,0.12)] bg-[rgba(17,24,38,0.55)] px-4 py-3">
+      <header className="flex items-center justify-between gap-[var(--gap-4)] border-b border-[var(--preview-header-border)] bg-[var(--preview-header-bg)] px-4 py-3 text-[var(--foreground)]">
         <div className="space-y-[var(--gap-1)]">
-          <h2 className="text-[var(--text)] font-semibold">Sandbox &amp; Preview</h2>
+          <h2 className="text-[var(--foreground)] font-semibold">Sandbox &amp; Preview</h2>
           <p className="text-[var(--muted)] text-[var(--size-small)]">Live rendering, logs, and sandbox insights</p>
         </div>
         <div className="flex items-center gap-[var(--gap-3)]">
@@ -282,11 +282,11 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
       </header>
 
       {shareUrl && (
-        <div className="px-4 py-3 border-b border-[rgba(148,163,184,0.12)] bg-[rgba(11,16,32,0.82)]">
+        <div className="px-4 py-3 border-b border-[var(--preview-header-border)] bg-[var(--preview-panel-bg)]">
           <div className="flex items-center gap-[var(--gap-3)]">
             <div className="flex-1">
               <p className="text-[var(--size-small)] text-[var(--muted)] mb-[var(--gap-1)]">Shareable preview link</p>
-              <p className="text-[var(--size-small)] font-mono bg-[rgba(15,20,33,0.92)] border border-[rgba(148,163,184,0.16)] rounded-[var(--radius)] px-3 py-2 text-[var(--text)] break-all">
+              <p className="text-[var(--size-small)] font-mono bg-[var(--preview-log-bg)] border border-[var(--preview-log-border)] rounded-[var(--radius)] px-3 py-2 text-[var(--foreground)] break-all">
                 {shareUrl}
               </p>
             </div>
@@ -312,8 +312,8 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
 
         <TabsContent value="preview" className="flex-1 min-h-0">
           <div className="flex flex-col h-full">
-            <div className="flex-1 flex flex-col rounded-[var(--radius)] border border-[rgba(148,163,184,0.16)] bg-[rgba(11,16,32,0.75)] overflow-hidden">
-              <div className="flex items-center gap-[var(--gap-3)] border-b border-[rgba(148,163,184,0.12)] bg-[rgba(17,24,38,0.9)] px-4 py-2">
+            <div className="flex-1 flex flex-col rounded-[var(--radius)] border border-[var(--preview-panel-border)] bg-[var(--preview-panel-bg)] overflow-hidden">
+              <div className="flex items-center gap-[var(--gap-3)] border-b border-[var(--preview-header-border)] bg-[var(--preview-header-bg)] px-4 py-2">
                 <div className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]"></span>
                   <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]"></span>
@@ -332,7 +332,7 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
                 </Button>
               </div>
 
-              <div className="flex-1 bg-[rgba(9,12,24,0.9)]">
+              <div className="flex-1 bg-[var(--preview-console-bg)]">
                 {iframeTemplate ? (
                   <iframe
                     id="preview-iframe"
@@ -374,7 +374,7 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
                     <span className={`text-[var(--size-small)] font-semibold ${logAccentClass(log.type)}`}>{log.type.toUpperCase()}</span>
                     <span className="text-[var(--muted)] text-[var(--size-small)]">{log.timestamp.toLocaleTimeString()}</span>
                   </div>
-                  <div className="text-[var(--text)] text-[var(--size-small)] whitespace-pre-wrap leading-relaxed">
+                  <div className="text-[var(--foreground)] text-[var(--size-small)] whitespace-pre-wrap leading-relaxed">
                     {log.message}
                   </div>
                 </div>
@@ -407,7 +407,7 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
                       <span className="text-[var(--error)] text-[var(--size-small)] font-semibold">Error {index + 1}</span>
                       <span className="text-[var(--muted)] text-[var(--size-small)]">{log.timestamp.toLocaleTimeString()}</span>
                     </div>
-                    <div className="text-[var(--text)] text-[var(--size-small)] whitespace-pre-wrap leading-relaxed">
+                    <div className="text-[var(--foreground)] text-[var(--size-small)] whitespace-pre-wrap leading-relaxed">
                       {log.message}
                     </div>
                   </div>
@@ -420,19 +420,19 @@ export default function PreviewPanel({ generatedCode, sandboxLogs = [], executio
           <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--gap-3)] h-full overflow-auto scrollbar-thin">
             <div className="rounded-[var(--radius)] border border-[rgba(34,197,94,0.25)] bg-[rgba(34,197,94,0.08)] px-4 py-3">
               <p className="text-[var(--muted)] text-[var(--size-small)]">Execution Time</p>
-              <p className="text-[var(--text)] text-lg font-semibold">{executionResult?.executionTime ?? 0} ms</p>
+              <p className="text-[var(--foreground)] text-lg font-semibold">{executionResult?.executionTime ?? 0} ms</p>
             </div>
             <div className="rounded-[var(--radius)] border border-[rgba(124,58,237,0.35)] bg-[rgba(124,58,237,0.12)] px-4 py-3">
               <p className="text-[var(--muted)] text-[var(--size-small)]">Code Length</p>
-              <p className="text-[var(--text)] text-lg font-semibold">{generatedCode?.length ?? 0} characters</p>
+              <p className="text-[var(--foreground)] text-lg font-semibold">{generatedCode?.length ?? 0} characters</p>
             </div>
             <div className="rounded-[var(--radius)] border border-[rgba(34,211,238,0.3)] bg-[rgba(34,211,238,0.12)] px-4 py-3">
               <p className="text-[var(--muted)] text-[var(--size-small)]">Result</p>
-              <p className="text-[var(--text)] text-lg font-semibold">{executionResult?.success ? 'Success' : 'Failure'}</p>
+              <p className="text-[var(--foreground)] text-lg font-semibold">{executionResult?.success ? 'Success' : 'Failure'}</p>
             </div>
             <div className="rounded-[var(--radius)] border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.12)] px-4 py-3">
               <p className="text-[var(--muted)] text-[var(--size-small)]">Total Logs</p>
-              <p className="text-[var(--text)] text-lg font-semibold">{sandboxLogs.length}</p>
+              <p className="text-[var(--foreground)] text-lg font-semibold">{sandboxLogs.length}</p>
             </div>
           </div>
         </TabsContent>

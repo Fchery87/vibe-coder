@@ -1682,7 +1682,7 @@ export default function Home() {
         <div className="flex flex-col min-h-0 xl:border-r border-[var(--border)]">
           {/* CLI Header */}
           <div className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--panel-alt)] flex-shrink-0">
-            <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
+            <h2 className="text-sm md:text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
               <svg className="w-4 h-4 md:w-5 md:h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -1694,7 +1694,7 @@ export default function Home() {
 
           {/* Generation Process - Show during generation */}
           {isGenerating && (
-            <div className="px-3 md:px-4 py-2 bg-slate-900/50 backdrop-blur-xl border-b border-[var(--border)]">
+            <div className="px-3 md:px-4 py-2 bg-[var(--panel-muted-bg)] backdrop-blur-xl border-b border-[var(--border)]">
               <ModelFeedbackLoop
                 isActive={isGenerating}
                 onComplete={() => {
@@ -1745,7 +1745,7 @@ export default function Home() {
               </TabsList>
 
               <div className="flex items-center justify-between">
-                <h2 className="text-sm md:text-base font-semibold text-white flex items-center gap-2">
+                <h2 className="text-sm md:text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
                   {activeView === 'editor' ? (
                     <>
                       <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1768,18 +1768,18 @@ export default function Home() {
 
                 {/* Run Metadata Display - Desktop only */}
                 {runMetadata && activeView === 'sandbox' && (
-                  <div className="hidden lg:flex items-center gap-2 text-xs">
+                  <div className="hidden lg:flex items-center gap-2 text-xs text-[var(--muted)]">
                     <div className="flex items-center gap-1">
-                      <span className="text-[var(--muted)]">Tokens:</span>
-                      <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
+                      <span>Tokens:</span>
+                      <span className="text-[var(--accent)] font-mono">{runMetadata.tokens.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[var(--muted)]">Cost:</span>
-                      <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
+                      <span>Cost:</span>
+                      <span className="text-[var(--success)] font-mono">${runMetadata.cost.toFixed(4)}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[var(--muted)]">Time:</span>
-                      <span className="text-blue-400 font-mono">{runMetadata.duration.toFixed(1)}s</span>
+                      <span>Time:</span>
+                      <span className="text-[var(--accent-2)] font-mono">{runMetadata.duration.toFixed(1)}s</span>
                     </div>
                   </div>
                 )}
@@ -1843,10 +1843,10 @@ export default function Home() {
       </div>
 
       {/* Terminal/Console with Status Feedback */}
-      <div className="h-32 md:h-40 glass-panel border-t border-white/10 bg-slate-900 transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col">
-        <div className="p-2 md:p-3 border-b border-white/10 flex-shrink-0">
+      <div className="h-32 md:h-40 glass-panel border-t border-[var(--border)] transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col">
+        <div className="p-2 md:p-3 border-b border-[var(--border)] flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs md:text-sm font-semibold text-white flex items-center gap-2">
+            <h3 className="text-xs md:text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
               <svg className="w-3 h-3 md:w-4 md:h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -1856,14 +1856,14 @@ export default function Home() {
 
             {/* Run Metadata Display - Mobile */}
             {runMetadata && (
-              <div className="flex sm:hidden items-center gap-2 text-xs">
+              <div className="flex sm:hidden items-center gap-2 text-xs text-[var(--muted)]">
                 <div className="flex items-center gap-1">
-                  <span className="text-[var(--muted)]">Tokens:</span>
-                  <span className="text-purple-400 font-mono">{runMetadata.tokens.toLocaleString()}</span>
+                  <span>Tokens:</span>
+                  <span className="text-[var(--accent)] font-mono">{runMetadata.tokens.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[var(--muted)]">Cost:</span>
-                  <span className="text-green-400 font-mono">${runMetadata.cost.toFixed(4)}</span>
+                  <span>Cost:</span>
+                  <span className="text-[var(--success)] font-mono">${runMetadata.cost.toFixed(4)}</span>
                 </div>
               </div>
             )}
@@ -1916,3 +1916,4 @@ export default function Home() {
     </WorkspaceShell>
   );
 }
+

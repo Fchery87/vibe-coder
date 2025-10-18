@@ -11,7 +11,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "scroll-fade relative inline-flex items-center gap-[var(--gap-2)] overflow-x-auto rounded-[var(--radius)] bg-[rgba(17,24,38,0.55)] p-[var(--gap-2)] text-[var(--muted)]",
+      "scroll-fade relative inline-flex items-center gap-[var(--gap-2)] overflow-x-auto rounded-[var(--radius)] bg-[var(--panel-muted-bg)] p-[var(--gap-2)] text-[var(--muted)] border border-[var(--border)]",
       className
     )}
     {...props}
@@ -26,9 +26,9 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius)] border border-[rgba(31,41,55,0.8)] bg-[rgba(15,20,33,0.9)] px-[var(--gap-4)] py-[var(--gap-2)] text-[var(--size-small)] font-medium text-[var(--muted)] transition-colors disabled:pointer-events-none disabled:opacity-50",
-      "hover:text-[var(--text)] hover:border-[rgba(124,58,237,0.35)]",
-      "data-[state=active]:border-[rgba(124,58,237,0.45)] data-[state=active]:bg-[rgba(124,58,237,0.12)] data-[state=active]:text-[var(--text)]",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius)] border border-[var(--tab-border)] bg-[var(--tab-bg)] px-[var(--gap-4)] py-[var(--gap-2)] text-[var(--size-small)] font-medium text-[var(--muted)] transition-colors disabled:pointer-events-none disabled:opacity-50",
+      "hover:text-[var(--foreground)] hover:border-[var(--accent)] hover:bg-[var(--tab-hover-bg)]",
+      "data-[state=active]:border-[var(--accent)] data-[state=active]:bg-[var(--tab-active-bg)] data-[state=active]:text-[var(--foreground)]",
       className
     )}
     {...props}
@@ -49,4 +49,3 @@ const TabsContent = React.forwardRef<
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };
-

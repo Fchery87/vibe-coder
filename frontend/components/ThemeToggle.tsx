@@ -24,7 +24,7 @@ export default function ThemeToggle() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:ring-offset-slate-800 transition-all duration-200"
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors duration-200 hover:bg-accent/10 dark:hover:bg-accent/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             type="button"
           >
@@ -53,7 +53,7 @@ export default function ThemeToggle() {
     // Fallback if ThemeProvider is not available
     return (
       <button
-        className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm opacity-50 cursor-not-allowed"
+        className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm opacity-50 cursor-not-allowed"
         disabled
         title="Theme toggle loading..."
         type="button"

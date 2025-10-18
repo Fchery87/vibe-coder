@@ -1434,11 +1434,11 @@ Try: npm install, git status, ls, or any shell command`;
 
   return (
     <div className="panel flex flex-col h-full font-mono overflow-hidden" style={{ fontSize: 'var(--size-code)' }}>
-      <header className="flex items-center justify-between gap-[var(--gap-4)] border-b border-[rgba(148,163,184,0.12)] bg-[rgba(17,24,38,0.55)] px-4 py-3 flex-shrink-0">
+      <header className="flex items-center justify-between gap-[var(--gap-4)] border-b border-[var(--cli-header-border)] bg-[var(--cli-header-bg)] px-4 py-3 flex-shrink-0 text-[var(--foreground)]">
         <div className="flex items-center gap-[var(--gap-3)]">
           <span className={activityDotClass}></span>
           <div className="leading-tight">
-            <span className="text-[var(--text)] font-semibold">Atlas CLI</span>
+            <span className="text-[var(--foreground)] font-semibold">Atlas CLI</span>
             <div className="text-[var(--muted)] text-[var(--size-small)]">Genie Agent v1.0</div>
           </div>
           {cliActivity.isActive && (
@@ -1462,9 +1462,9 @@ Try: npm install, git status, ls, or any shell command`;
                 className={[
                   'px-3 py-1.5 rounded-full border text-xs transition-colors',
                   activeMode === option.id
-                    ? 'border-purple-400 bg-purple-500/20 text-purple-100'
-                    : 'border-slate-600/60 text-gray-400 hover:border-purple-400 hover:text-white',
-                  option.disabled ? 'opacity-40 cursor-not-allowed hover:border-slate-600/60 hover:text-gray-400' : ''
+                    ? 'border-transparent bg-[var(--accent)] text-white shadow-sm'
+                    : 'border-[var(--cli-toggle-border)] bg-[var(--cli-toggle-bg)] text-[var(--cli-toggle-foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)]',
+                  option.disabled ? 'opacity-40 cursor-not-allowed hover:border-[var(--cli-toggle-border)] hover:text-[var(--cli-toggle-foreground)]' : ''
                 ].join(' ')}
                 title={option.disabled ? `${option.hint} (Enable Ask Mode in Settings)` : option.hint}
               >
@@ -1537,8 +1537,11 @@ Try: npm install, git status, ls, or any shell command`;
           ))}
         </div>
 
-        <div className="border-t border-[rgba(148,163,184,0.12)] bg-[rgba(11,16,32,0.9)] px-4 py-3 shadow-[0_-6px_18px_rgba(8,12,24,0.45)]">
-          <InputGroup className="bg-[rgba(15,20,33,0.92)]">
+        <div
+          className="border-t border-[var(--cli-input-border)] bg-[var(--cli-input-shell-bg)] px-4 py-3"
+          style={{ boxShadow: 'var(--cli-input-shadow)' }}
+        >
+          <InputGroup className="bg-[var(--cli-input-bg)] border border-[var(--cli-input-border)] rounded-lg">
             <InputGroupTextarea
               ref={inputRef}
               value={currentCommand}
@@ -1549,11 +1552,11 @@ Try: npm install, git status, ls, or any shell command`;
               spellCheck={false}
               autoComplete="off"
               rows={1}
-              className="min-h-[40px] max-h-[200px] resize-none"
+              className="min-h-[40px] max-h-[200px] resize-none bg-transparent text-[var(--foreground)] placeholder:text-[var(--muted)]"
             />
             <InputGroupAddon align="block-end">
               <InputGroupButton
-                className="rounded-full"
+                className="rounded-full text-[var(--muted)] hover:text-[var(--accent)]"
                 size="icon-xs"
                 variant="outline"
                 disabled={isExecuting}
@@ -1570,19 +1573,19 @@ Try: npm install, git status, ls, or any shell command`;
                     onModeChange?.(value as PromptMode);
                   }
                 }}
-                className="gap-0 border border-input rounded-md overflow-hidden h-6"
+                className="gap-0 border border-[var(--cli-toggle-border)] rounded-md overflow-hidden h-6 bg-[var(--cli-toggle-bg)] text-[var(--cli-toggle-foreground)]"
                 disabled={isExecuting}
               >
                 <ToggleGroupItem
                   value="quick"
-                  className="h-6 px-2 text-xs rounded-none border-r border-input data-[state=on]:bg-purple-600 data-[state=on]:text-white"
+                  className="h-6 px-2 text-xs rounded-none border-r border-[var(--cli-toggle-border)] data-[state=on]:bg-[var(--accent)] data-[state=on]:text-white"
                   disabled={isExecuting}
                 >
                   Quick
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="think"
-                  className="h-6 px-2 text-xs rounded-none data-[state=on]:bg-purple-600 data-[state=on]:text-white"
+                  className="h-6 px-2 text-xs rounded-none data-[state=on]:bg-[var(--accent)] data-[state=on]:text-white"
                   disabled={isExecuting}
                 >
                   Think
@@ -1595,12 +1598,12 @@ Try: npm install, git status, ls, or any shell command`;
                 variant={activeMode === 'ask' ? 'default' : 'ghost'}
                 onClick={() => onModeChange?.('ask')}
                 disabled={!askEnabled || isExecuting}
-                className={`h-6 px-2 text-xs ${activeMode === 'ask' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
+                className={`h-6 px-2 text-xs transition-colors ${activeMode === 'ask' ? 'bg-[var(--accent)] hover:brightness-95 text-white' : 'text-[var(--cli-toggle-foreground)] hover:text-[var(--accent)]'}`}
               >
                 Ask
               </InputGroupButton>
 
-              <InputGroupText className="ml-auto text-xs">
+              <InputGroupText className="ml-auto text-xs bg-transparent text-[var(--muted)]">
                 {currentCommand.length > 0 ? `${currentCommand.length}` : ''}
               </InputGroupText>
               <Separator className="!h-4" orientation="vertical" />
@@ -1619,7 +1622,7 @@ Try: npm install, git status, ls, or any shell command`;
         </div>
       </div>
 
-      <footer className="px-4 py-2 border-t border-[rgba(148,163,184,0.12)] bg-[rgba(17,24,38,0.6)] text-[var(--size-small)] text-[var(--muted)] flex items-center justify-between">
+      <footer className="px-4 py-2 border-t border-[var(--cli-header-border)] bg-[var(--cli-footer-bg)] text-[var(--size-small)] text-[var(--muted)] flex items-center justify-between">
         <span>Atlas has full local shell access</span>
         <span>{cliActivity.isActive ? 'Working...' : 'Ready'}</span>
       </footer>
