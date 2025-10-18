@@ -13,6 +13,11 @@ import { initializeWorkers } from './services/workers';
 import { shutdownQueues } from './services/queue-manager';
 import prisma from './services/database';
 
+// Import logging and monitoring
+import { log, flushLogs } from './services/logger';
+import { httpLogger, errorLogger, requestId, slowRequestLogger } from './middleware/logging';
+import { performanceMonitor } from './services/performance-monitor';
+
 // Check if this is a CLI invocation
 const args = process.argv.slice(2);
 const isCLI = args.length > 0 && !args.includes('--server');
@@ -37,58 +42,107 @@ if (isCLI) {
   const app = express();
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;
 
+  // CORS configuration
   app.use(cors({
     origin: ['http://localhost:3000', 'https://vibe-coder.vercel.app']
   }));
+
+  // Body parsing
   app.use(express.json());
-  app.use((req: any, res: any, next: any) => {
-    console.log(`[request] ${req.method} ${req.originalUrl}`);
-    next();
-  });
+
+  // Logging and monitoring middleware
+  app.use(requestId); // Add request ID to all requests
+  app.use(httpLogger); // Log all HTTP requests
+  app.use(slowRequestLogger(2000)); // Warn on requests >2s
+
+  // Routes
   app.use('/llm', llmRouter);
   app.use('/preview', previewRouter);
+
+  // Error logging middleware (must be after routes)
+  app.use(errorLogger);
 
   app.get('/', (req: any, res: any) => {
     console.log('[handler] GET /');
     res.send('Hello from the orchestrator backend!');
   });
 
+  // Health check endpoint
+  app.get('/health', async (req: any, res: any) => {
+    const health = await performanceMonitor.healthCheck();
+    res.status(health.healthy ? 200 : 503).json(health);
+  });
+
+  // Performance dashboard endpoint
+  app.get('/metrics', async (req: any, res: any) => {
+    const dashboard = await performanceMonitor.getDashboard();
+    res.json(dashboard);
+  });
+
   // Initialize background workers
-  console.log('\n[workers] Initializing background job workers...');
+  log.info('Initializing background job workers');
   initializeWorkers();
 
   const server = app.listen(port, () => {
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
-    console.log(`\n[o] Backend server listening at ${baseUrl}`);
-    console.log('[o] Background workers initialized and ready');
-    console.log('\n[o] Available services:');
+    log.info('Backend server started', {
+      baseUrl,
+      port,
+      env: process.env.NODE_ENV || 'development',
+      logtail: !!process.env.LOGTAIL_SOURCE_TOKEN,
+    });
+
+    console.log(`\n✅ Backend server listening at ${baseUrl}`);
+    console.log('✅ Background workers initialized and ready');
+    console.log('✅ Logging and monitoring active');
+    console.log('\nAvailable services:');
     console.log(`  - LLM API: ${baseUrl}/llm`);
     console.log(`  - Preview: ${baseUrl}/preview`);
-    console.log('  - Job Queue: Active and processing');
+    console.log(`  - Health: ${baseUrl}/health`);
+    console.log(`  - Metrics: ${baseUrl}/metrics`);
   });
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
-    console.log(`\n${signal} received. Starting graceful shutdown...`);
+    log.info(`${signal} received, starting graceful shutdown`);
 
     // Close HTTP server
     server.close(() => {
-      console.log('✅ HTTP server closed');
+      log.info('HTTP server closed');
     });
 
     // Shutdown background workers and queues
     await shutdownQueues();
+    log.info('Background workers shutdown');
+
+    // Flush logs before closing
+    await flushLogs();
+    log.info('Logs flushed');
 
     // Close database connection
     await prisma.$disconnect();
-    console.log('✅ Database disconnected');
+    log.info('Database disconnected');
 
-    console.log('✅ Graceful shutdown complete');
+    log.info('Graceful shutdown complete');
     process.exit(0);
   };
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (error) => {
+    log.fatal('Uncaught exception', error);
+    shutdown('uncaughtException');
+  });
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason, promise) => {
+    log.error('Unhandled promise rejection', {
+      reason,
+      promise,
+    });
+  });
 }
 
 // CLI Types and Functions
