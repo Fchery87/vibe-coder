@@ -59,8 +59,8 @@ export default function TabBar({
                 key={tab.id}
                 className={`tab-item group flex items-center gap-[var(--gap-2)] px-3 py-2 text-[var(--size-small)] cursor-pointer border-r border-[var(--border)] whitespace-nowrap flex-shrink-0 transition-colors ${
                   activeTabId === tab.id
-                    ? 'bg-[var(--bg)] text-white border-b-2 border-b-purple-500'
-                    : 'text-[var(--muted)] hover:text-white hover:bg-[rgba(148,163,184,0.05)]'
+                    ? 'bg-[var(--tab-active-bg)] text-[var(--foreground)] border-b-2 border-b-[var(--accent)] shadow-sm'
+                    : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--tab-hover-bg)]'
                 }`}
                 onClick={() => onTabSelect(tab.id)}
                 onMouseDown={(e) => handleMiddleClick(e, tab.id)}
@@ -95,7 +95,7 @@ export default function TabBar({
             {/* Overflow indicator */}
             {showOverflow && (
               <div
-                className="tab-item flex items-center gap-1 px-3 py-2 text-[var(--size-small)] border-r border-[var(--border)] bg-slate-800/50 text-[var(--muted)] cursor-default"
+                className="tab-item flex items-center gap-1 px-3 py-2 text-[var(--size-small)] border-r border-[var(--border)] bg-[var(--panel-muted-bg)] text-[var(--muted)] cursor-default"
                 title={`${overflowCount} more tab${overflowCount > 1 ? 's' : ''}`}
               >
                 <span className="text-xs">+{overflowCount}</span>

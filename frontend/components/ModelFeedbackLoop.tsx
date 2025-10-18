@@ -201,7 +201,7 @@ export default function ModelFeedbackLoop({ isActive, currentStep, onComplete }:
       case 'completed': return 'bg-green-500/20 border-green-400/30';
       case 'active': return 'bg-blue-500/20 border-blue-400/30 animate-pulse';
       case 'error': return 'bg-red-500/20 border-red-400/30';
-      default: return 'bg-slate-700/50 border-slate-600/50';
+      default: return 'bg-[var(--panel-muted-bg)] border-[var(--panel-muted-border)]';
     }
   };
 
@@ -210,11 +210,11 @@ export default function ModelFeedbackLoop({ isActive, currentStep, onComplete }:
   return (
     <div className="glass-panel rounded-lg p-6 mb-4">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
           🤖 AI Generation Process
         </h3>
         {startTime && (
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-[var(--muted)]">
             Started {Math.floor((new Date().getTime() - startTime.getTime()) / 1000)}s ago
           </div>
         )}
@@ -242,7 +242,7 @@ export default function ModelFeedbackLoop({ isActive, currentStep, onComplete }:
               <div className={`absolute top-6 left-1/2 w-full h-0.5 -z-10 ${
                 steps[index + 1].status === 'completed' ? 'bg-green-400' :
                 steps[index].status === 'completed' ? 'bg-blue-400' :
-                'bg-slate-600'
+                'bg-[var(--border)]'
               }`} style={{ width: 'calc(100% - 3rem)', left: '50%', transform: 'translateX(-50%)' }} />
             )}
           </div>
@@ -250,16 +250,16 @@ export default function ModelFeedbackLoop({ isActive, currentStep, onComplete }:
       </div>
 
       {/* Current Activity */}
-      <div className="bg-slate-800/50 rounded-lg p-4">
+      <div className="bg-[var(--panel-muted-bg)] rounded-lg p-4 border border-[var(--panel-muted-border)]">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-          <span className="text-sm font-medium text-white">
+          <span className="text-sm font-medium text-[var(--foreground)]">
             {steps.find(s => s.status === 'active')?.description || 'Processing...'}
           </span>
         </div>
 
         {currentLog && (
-          <div className="text-sm text-gray-300 font-mono">
+          <div className="text-sm text-[var(--muted)] font-mono">
             {currentLog}
           </div>
         )}
@@ -267,10 +267,10 @@ export default function ModelFeedbackLoop({ isActive, currentStep, onComplete }:
         {/* Step Logs */}
         {steps.filter(s => s.status !== 'pending' && s.logs && s.logs.length > 0).map(step => (
           <div key={step.id} className="mt-3">
-            <div className="text-xs text-gray-400 mb-1">{step.label} Logs:</div>
+            <div className="text-xs text-[var(--muted)] mb-1">{step.label} Logs:</div>
             <div className="space-y-1 max-h-20 overflow-y-auto">
               {step.logs?.slice(-3).map((log, i) => (
-                <div key={i} className="text-xs text-gray-300 font-mono bg-slate-900/50 px-2 py-1 rounded">
+                <div key={i} className="text-xs text-[var(--muted)] font-mono bg-[var(--panel)] px-2 py-1 rounded border border-[var(--panel-muted-border)]">
                   {log}
                 </div>
               ))}
@@ -281,11 +281,11 @@ export default function ModelFeedbackLoop({ isActive, currentStep, onComplete }:
 
       {/* Progress Bar */}
       <div className="mt-4">
-        <div className="flex justify-between text-xs text-gray-400 mb-1">
+        <div className="flex justify-between text-xs text-[var(--muted)] mb-1">
           <span>Progress</span>
           <span>{steps.filter(s => s.status === 'completed').length}/{steps.length} steps</span>
         </div>
-        <div className="w-full bg-slate-700 rounded-full h-2">
+        <div className="w-full bg-[var(--border)]/50 rounded-full h-2">
           <div
             className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
             style={{ width: `${(steps.filter(s => s.status === 'completed').length / steps.length) * 100}%` }}

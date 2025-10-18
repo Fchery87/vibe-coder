@@ -41,6 +41,8 @@
   --editor-shell-outline: rgba(79, 70, 229, 0.18);
   --topbar-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
   --panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  --scroll-fade-start: rgba(244, 246, 251, 0);
+  --scroll-fade-end: rgba(244, 246, 251, 1);
 
   /* CLI surfaces */
   --cli-header-bg: #f7f9fc;
@@ -424,7 +426,7 @@ kbd {
   top: 0;
   width: 32px;
   height: 100%;
-  background: linear-gradient(90deg, rgba(11, 16, 32, 0), rgba(11, 16, 32, 1));
+  background: linear-gradient(90deg, var(--scroll-fade-start), var(--scroll-fade-end));
   pointer-events: none;
 }
 
@@ -883,6 +885,8 @@ kbd {
   --editor-shell-outline: rgba(124, 58, 237, 0.35);
   --topbar-shadow: 0 2px 12px rgba(5, 8, 16, 0.55);
   --panel-shadow: 0 16px 40px rgba(8, 12, 24, 0.45);
+  --scroll-fade-start: rgba(11, 16, 32, 0);
+  --scroll-fade-end: rgba(11, 16, 32, 1);
   --cli-header-bg: rgba(17, 24, 38, 0.55);
   --cli-header-border: rgba(148, 163, 184, 0.12);
   --cli-footer-bg: rgba(17, 24, 38, 0.6);

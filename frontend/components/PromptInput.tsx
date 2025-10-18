@@ -47,25 +47,25 @@ export default function PromptInput({ onSubmit, mode, onModeChange, askEnabled =
   ];
 
   return (
-    <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+    <div className="glass-panel rounded-2xl p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
             🚀 AI Code Generation
           </h3>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-[var(--muted)]">
             Describe what you want to build and let AI create it for you
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">{prompt.length} chars</span>
-            <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full">
+            <span className="text-xs text-[var(--muted)]">{prompt.length} chars</span>
+            <span className="text-xs px-2 py-1 bg-[var(--accent)]/15 text-[var(--accent)] rounded-full">
               Ctrl+Enter
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+          <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
             {promptModes.map(({ id, label, description, disabled }) => (
               <button
                 key={id}
@@ -74,8 +74,8 @@ export default function PromptInput({ onSubmit, mode, onModeChange, askEnabled =
                 disabled={disabled || isSubmitting}
                 className={`px-3 py-1.5 rounded-full border text-xs transition-colors ${
                   mode === id
-                    ? 'border-purple-400 bg-purple-500/20 text-purple-200'
-                    : 'border-slate-600/60 text-gray-400 hover:border-purple-400 hover:text-white'
+                    ? 'border-transparent bg-[var(--accent)] text-white shadow-sm'
+                    : 'border-[var(--cli-toggle-border)] bg-[var(--cli-toggle-bg)] text-[var(--cli-toggle-foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
                 } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                 title={description + (disabled ? ' (Enable Ask Mode in Settings)' : '')}
               >
@@ -101,21 +101,21 @@ Examples:
 • Create a real-time chat application with WebSocket
 
 💡 Tip: Use @filename to target specific files (e.g., 'Refactor @App.js')"
-          className="w-full min-h-[120px] p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm"
+          className="w-full min-h-[120px] p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder-[var(--muted)] resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm"
           disabled={isSubmitting}
         />
       </div>
 
       {/* Quick Suggestions */}
       <div className="mb-4">
-        <p className="text-xs text-gray-400 mb-3">Quick suggestions:</p>
+        <p className="text-xs text-[var(--muted)] mb-3">Quick suggestions:</p>
         <div className="flex flex-wrap gap-2">
           {suggestions.map((suggestion, index) => (
             <button
               key={index}
               onClick={() => setPrompt(suggestion)}
               disabled={isSubmitting}
-              className="px-3 py-2 text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-gray-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+              className="px-3 py-2 text-xs bg-[var(--panel-muted-bg)] hover:bg-[var(--tab-hover-bg)] border border-[var(--border)] rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
             >
               {suggestion}
             </button>
@@ -125,7 +125,7 @@ Examples:
 
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
-        <div className="text-xs text-gray-400">
+        <div className="text-xs text-[var(--muted)]">
           💡 Tip: Be specific about language, framework, and requirements
         </div>
 
@@ -133,7 +133,7 @@ Examples:
           <button
             onClick={() => setPrompt('')}
             disabled={isSubmitting || !prompt}
-            className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm text-[var(--muted)] hover:text-[var(--accent)] transition-colors disabled:opacity-50"
           >
             Clear
           </button>
