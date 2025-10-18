@@ -6,7 +6,7 @@
     "start": "nodemon --watch 'src/**/*.ts' --exec npx ts-node src/index.ts",
     "start:prod": "node dist/index.js",
     "cli": "npx ts-node src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-assets.js",
     "test": "jest",
     "prisma:generate": "node node_modules/prisma/build/index.js generate",
     "prisma:migrate": "node node_modules/prisma/build/index.js migrate dev",
