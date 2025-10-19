@@ -36,10 +36,18 @@ export default function GitHubConnect({ onConnect, onDisconnect }: GitHubConnect
       const res = await fetch('/api/github/user');
       const data = await res.json();
 
+      if (data.error) {
+        setError(data.error);
+        setUser(null);
+        return;
+      }
+
       if (data.isLoggedIn && data.user) {
+        setError(null);
         setUser(data.user);
         onConnect?.();
       } else {
+        setError(null);
         setUser(null);
       }
     } catch (err: any) {

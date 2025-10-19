@@ -5,7 +5,24 @@ import { getUserClient } from "@/lib/github-client";
 import { cookies } from "next/headers";
 
 export async function GET(request: NextRequest) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+  if (!process.env.SESSION_SECRET) {
+    console.error("SESSION_SECRET is not configured; cannot load GitHub installations");
+    return NextResponse.json(
+      { error: "GitHub session not configured" },
+      { status: 500 },
+    );
+  }
+
+  let session: SessionData;
+  try {
+    session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+  } catch (error: any) {
+    console.error("Failed to load GitHub session:", error);
+    return NextResponse.json(
+      { error: "Failed to load GitHub session" },
+      { status: 500 },
+    );
+  }
 
   if (!session.isLoggedIn || !session.accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
