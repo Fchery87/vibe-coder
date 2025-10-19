@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyWebhookSignature } from '@/lib/github-client';
-import { getWebhookEventBus } from '@/lib/webhook-events';
+import { getWebhookEventBus, storeWebhookEvent, getWebhookEvents } from '@/lib/webhook-events';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
+    const type = searchParams.get('type') || undefined;
+
+    const events = getWebhookEvents(limit, type);
+
+    return NextResponse.json({ events });
+  } catch (err: any) {
+    console.error('Webhook GET error:', err);
+    return NextResponse.json({ error: err.message || 'Failed to fetch events' }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +36,9 @@ export async function POST(request: NextRequest) {
 
     // Parse event body
     const body = JSON.parse(rawBody);
+
+    // Store the event for polling clients
+    storeWebhookEvent(event, body);
 
     // Minimal logging + shaping a response for debugging
     const info = { event, action: body.action, repository: body.repository?.full_name, sender: body.sender?.login };
